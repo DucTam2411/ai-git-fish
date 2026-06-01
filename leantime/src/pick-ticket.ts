@@ -1,6 +1,6 @@
 import 'dotenv/config'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
-import { fetchAllTickets, type LeantimeTicket } from './leantime.js'
+import { fetchAllTickets, fetchUsers, type LeantimeTicket } from './leantime.js'
 
 // Shared cache dir. fzf preview reads pre-rendered <id>.txt from here (instant, no re-fetch).
 const CACHE_DIR = '/tmp/leantime-pick'
@@ -157,8 +157,28 @@ async function printMarkdown(id: string) {
   process.stdout.write(block)
 }
 
+// `pick-ticket.ts users` → print "<id>\t<name> <username>" per user, for the
+// installer to fzf-pick LEANTIME_USER_ID. Errors bubble up (exit 1) so the
+// installer can fall back to manual id entry.
+async function printUsers() {
+  const users = await fetchUsers()
+  const lines = users
+    .map((u) => {
+      const name = [u.firstname, u.lastname].filter(Boolean).join(' ').trim()
+      const uname = u.username ? `<${u.username}>` : ''
+      const label = [name, uname].filter(Boolean).join(' ') || `user ${u.id}`
+      return `${u.id}\t${label}`
+    })
+    .filter((l) => l.split('\t')[0])
+  process.stdout.write(lines.length ? `${lines.join('\n')}\n` : '')
+}
+
 async function main() {
   const arg = process.argv[2]
+  if (arg === 'users') {
+    await printUsers()
+    return
+  }
   if (arg === 'markdown' && process.argv[3] && /^\d+$/.test(process.argv[3])) {
     await printMarkdown(process.argv[3])
     return

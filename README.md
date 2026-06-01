@@ -24,11 +24,29 @@ brew install jq gh fzf node gitleaks   # macOS
 
 ## Install
 
+### Guided installer (recommended)
+
+```sh
+fish (curl -sL https://raw.githubusercontent.com/DucTam2411/ai-git-fish/main/install.fish | psub)
+```
+
+It will:
+
+- check deps and **offer to install** missing ones (macOS `brew`; Linux `apt`/`dnf`/`pacman`)
+- run `gh auth login` if you're not authenticated
+- `fisher install` the plugin (which downloads the Leantime backend + `npm install`)
+- prompt for `DEEPSEEK_API_KEY` (saved as a universal var)
+- prompt for `LEANTIME_BASE_URL` / `LEANTIME_API_KEY`, then **fzf-pick your user** to set `LEANTIME_USER_ID`
+
+Re-runnable any time to reconfigure.
+
+### Manual
+
 ```sh
 fisher install DucTam2411/ai-git-fish
 ```
 
-On install, a `conf.d` hook downloads the Leantime backend into `~/.config/fish/leantime` and runs `npm install`. (Override the location with `LEANTIME_SCRIPT_DIR`.)
+A `conf.d` hook downloads the Leantime backend into `~/.config/fish/leantime` and runs `npm install` (override with `LEANTIME_SCRIPT_DIR`). Then configure as below.
 
 **Private repo?** Each dev needs read access plus working git auth (SSH key or the `gh` credential helper) for `fisher install` to clone. The bootstrap fetches the backend via authenticated `gh` (run `gh auth login` first), falling back to public `curl` otherwise.
 
