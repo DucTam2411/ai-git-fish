@@ -75,9 +75,18 @@ function aicommit --description 'Generate conventional commit msg from staged di
         test -n "$from_hint"; and set ticket "$from_hint"
     end
     if test -z "$ticket"; and type -q fzf; and type -q npx
-        read -l -P "No ticket id in branch '$branch'. Pick from Leantime? [y/N] " pick
+        read -l -P "No ticket id in branch '$branch'. Pick a ticket + switch to its branch? [y/N] " pick
         if test "$pick" = y -o "$pick" = Y
             set ticket (__leantime_pick)
+            # Move the staged changes onto a proper ticket branch, then commit there.
+            # git switch carries the staged index over (aborts cleanly on conflict).
+            if test -n "$ticket"; and functions -q aibranch
+                if aibranch feat $ticket
+                    set branch (git rev-parse --abbrev-ref HEAD 2>/dev/null)
+                else
+                    echo "aicommit: branch switch failed — committing on '$branch', labeling [#$ticket]" >&2
+                end
+            end
         end
     end
 

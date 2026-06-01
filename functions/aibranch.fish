@@ -1,5 +1,6 @@
 function aibranch --description 'Pick a Leantime ticket and create/switch a git branch'
-    # Usage: aibranch [type]   (type defaults to feat: feat|fix|chore|refactor|...)
+    # Usage: aibranch [type] [ticket_id]   (type defaults to feat: feat|fix|chore|...)
+    #        ticket_id given -> skip the picker (aicommit passes an already-picked id).
     if not git rev-parse --is-inside-work-tree >/dev/null 2>&1
         echo "aibranch: not a git repo" >&2
         return 1
@@ -10,11 +11,14 @@ function aibranch --description 'Pick a Leantime ticket and create/switch a git 
         set type $argv[1]
     end
 
-    set -l id (__leantime_pick)
-    or return 1
+    set -l id $argv[2]
+    if test -z "$id"
+        set id (__leantime_pick)
+        or return 1
+    end
 
-    # Slug from cached preview line 1: "#<id>  <headline>".
-    set -l head (sed -n '1p' /tmp/leantime-pick/$id.txt | string replace -r '^#\S+\s+' '')
+    # Slug from cached preview line 1: "#<id>  <headline>" (empty if no cache -> type/id).
+    set -l head (sed -n '1p' /tmp/leantime-pick/$id.txt 2>/dev/null | string replace -r '^#\S+\s+' '')
     set -l slug (string lower -- $head \
         | string replace -r -a '[^a-z0-9]+' '-' \
         | string trim -c '-' \
