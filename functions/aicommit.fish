@@ -88,6 +88,14 @@ function aicommit --description 'Generate conventional commit msg from staged di
         end
     end
 
+    # Ticket is mandatory: every commit must reference a Leantime ticket.
+    # No id resolved (cancelled pick, or no fzf/tsx) -> abort instead of committing.
+    if test -z "$ticket"
+        __aigit_err "no ticket selected — aborting (a commit must reference a Leantime ticket)"
+        __aigit_info "set one via the branch name, AICOMMIT_TICKET=<id>, or a #<id> in your hint"
+        return 1
+    end
+
     # --- fetch ticket content (headline + description) to focus the LLM ---
     set -l ticket_ctx ""
     if test -n "$ticket"; and type -q npx
