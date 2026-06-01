@@ -15,9 +15,10 @@ function _warn; echo "  "(set_color -o yellow)"▲"(set_color normal)" $argv" >&
 function _err;  echo "  "(set_color -o red)"✗"(set_color normal)" $argv" >&2; end
 function _banner
     set -l c (set_color -o brmagenta); set -l d (set_color brblack); set -l n (set_color normal)
+    set -l padded (string pad --right --width 42 -- "guided installer")
     echo ""
     echo "$c  ╭─ ✨ ai-git-fish ───────────────────────────╮$n"
-    printf '%s  │  %s%-42s%s│%s\n' "$c" "$d" "guided installer" "$c" "$n"
+    echo "$c  │  $d$padded$c│$n"
     echo "$c  ╰────────────────────────────────────────────╯$n"
 end
 _banner

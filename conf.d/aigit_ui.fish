@@ -12,9 +12,11 @@ function __aigit_banner # __aigit_banner [subtitle]
     set -l sub "aicommit · aibranch · aipr"
     test -n "$argv[1]"; and set sub "$argv[1]"
     set -l c (__aigit_col -o brmagenta); set -l d (__aigit_col brblack); set -l n (__aigit_col normal)
+    # string pad counts characters (not bytes) so multibyte glyphs keep the border aligned
+    set -l padded (string pad --right --width 42 -- "$sub")
     echo "" >&2
     echo "$c  ╭─ ✨ ai-git-fish ───────────────────────────╮$n" >&2
-    printf '%s  │  %s%-42s%s│%s\n' "$c" "$d" "$sub" "$c" "$n" >&2
+    echo "$c  │  $d$padded$c│$n" >&2
     echo "$c  ╰────────────────────────────────────────────╯$n" >&2
 end
 
