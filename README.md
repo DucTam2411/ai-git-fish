@@ -1,0 +1,83 @@
+# ai-git-fish
+
+AI-assisted git for [fish](https://fishshell.com). Three functions, powered by DeepSeek + optional [Leantime](https://leantime.io) ticket linking:
+
+| Command | Does |
+|---------|------|
+| `aicommit [hint]` | Generate a Conventional Commit message from your **staged** diff, preview it, commit on confirm. |
+| `aibranch [type]` | fzf-pick a Leantime ticket assigned to you, create/switch to `type/<id>-<slug>` (default `type` = `feat`). |
+| `aipr [hint]` | Push the branch, write a PR title + markdown body from your commits, link the Leantime ticket, create or update the GitHub PR. |
+
+All three auto-detect a ticket id from the branch name (`\d{3,}`), an `AICOMMIT_TICKET` / `AIPR_TICKET` env var, a `#1234` in your hint, or an fzf picker.
+
+## Prerequisites
+
+- `fish` ≥ 3.4 and [fisher](https://github.com/jorgebucaran/fisher)
+- `git`, `curl`, `jq`, `gh` (authenticated: `gh auth login`)
+- `node` ≥ 18 (provides `npx`; `tsx` is installed locally by the bootstrap)
+- `fzf` — for the interactive ticket picker
+- *optional* `gitleaks` — `aicommit` runs a staged-secret scan before any diff leaves your machine
+
+```sh
+brew install jq gh fzf node gitleaks   # macOS
+```
+
+## Install
+
+```sh
+fisher install DucTam2411/ai-git-fish
+```
+
+On install, a `conf.d` hook downloads the Leantime backend into `~/.config/fish/leantime` and runs `npm install`. (Override the location with `LEANTIME_SCRIPT_DIR`.)
+
+**Private repo?** Each dev needs read access plus working git auth (SSH key or the `gh` credential helper) for `fisher install` to clone. The bootstrap fetches the backend via authenticated `gh` (run `gh auth login` first), falling back to public `curl` otherwise.
+
+## Configure
+
+1. **DeepSeek key** — required by `aicommit` / `aipr`. Put in `~/.config/fish/config.fish` (or a gitignored file you source):
+
+   ```fish
+   set -gx DEEPSEEK_API_KEY sk-xxxxxxxx
+   ```
+
+2. **Leantime** — required by `aibranch` and the ticket-linking in `aicommit`/`aipr`. Edit the seeded `.env`:
+
+   ```sh
+   $EDITOR ~/.config/fish/leantime/.env
+   ```
+   ```ini
+   LEANTIME_BASE_URL=https://your-leantime.example.com
+   LEANTIME_API_KEY=your-leantime-api-key
+   LEANTIME_USER_ID=your-numeric-user-id
+   ```
+
+`aicommit` and `aipr` work **without** Leantime — they just skip the ticket section. `aibranch` needs it.
+
+> Never commit keys. `DEEPSEEK_API_KEY` belongs in your shell env; `.env` is gitignored.
+
+## Usage
+
+```sh
+git add -p
+aicommit "drop the debug logging"        # preview + commit
+
+aibranch fix                             # pick ticket -> fix/1234-slug
+
+aipr "focus on the migration"            # open / update the GitHub PR
+```
+
+## How it bootstraps
+
+Fisher only installs `functions/`, `completions/`, `conf.d/`. The Leantime picker is a small TypeScript project (`leantime/`), so `conf.d/ai-git-fish.fish` fetches it on `fisher install` / `fisher update` and runs `npm install`. To re-run manually:
+
+```fish
+__ai_git_fish_bootstrap
+```
+
+## Uninstall
+
+```sh
+fisher remove DucTam2411/ai-git-fish
+```
+
+Your `~/.config/fish/leantime` (holding `.env`) is left in place — delete it by hand if you want it gone.

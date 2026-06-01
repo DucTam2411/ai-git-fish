@@ -1,0 +1,10 @@
+{
+  "name": "leantime-pick",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Standalone Leantime ticket picker for aicommit/aibranch/aipr fish funcs",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "tsx": "^4.19.2"
+  }
+}
