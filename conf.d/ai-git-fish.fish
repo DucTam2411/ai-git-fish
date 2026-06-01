@@ -17,12 +17,12 @@ function __ai_git_fish_bootstrap --description 'Download + install the Leantime 
     set -l dir (__ai_git_fish_dir)
     for dep in tar npm
         if not type -q $dep
-            echo "ai-git-fish: '$dep' not found — install it, then run __ai_git_fish_bootstrap" >&2
+            __aigit_err "'$dep' not found — install it, then run __ai_git_fish_bootstrap"
             return 1
         end
     end
 
-    echo "ai-git-fish: fetching Leantime backend into $dir ..." >&2
+    __aigit_step "Fetching Leantime backend into $dir"
     set -l tmp (mktemp -d)
     # Prefer authenticated `gh` so this works on PRIVATE repos; fall back to public curl.
     if type -q gh; and gh auth status >/dev/null 2>&1
@@ -31,13 +31,13 @@ function __ai_git_fish_bootstrap --description 'Download + install the Leantime 
         set -l url "https://codeload.github.com/$AI_GIT_FISH_REPO/tar.gz/refs/heads/$AI_GIT_FISH_BRANCH"
         curl -sSL "$url" | tar -xz -C $tmp 2>/dev/null
     else
-        echo "ai-git-fish: need 'gh' (private repo) or 'curl' (public) to fetch backend" >&2
+        __aigit_err "need 'gh' (private repo) or 'curl' (public) to fetch backend"
         rm -rf $tmp
         return 1
     end
     set -l extracted (path filter -d $tmp/*/leantime)[1]
     if test -z "$extracted"
-        echo "ai-git-fish: download/extract failed for $AI_GIT_FISH_REPO@$AI_GIT_FISH_BRANCH" >&2
+        __aigit_err "download/extract failed for $AI_GIT_FISH_REPO@$AI_GIT_FISH_BRANCH"
         rm -rf $tmp
         return 1
     end
@@ -49,21 +49,21 @@ function __ai_git_fish_bootstrap --description 'Download + install the Leantime 
     test -f $extracted/package-lock.json; and cp $extracted/package-lock.json $dir/
     if not test -f $dir/.env
         cp $extracted/.env.example $dir/.env
-        echo "ai-git-fish: wrote $dir/.env — fill in LEANTIME_BASE_URL / LEANTIME_API_KEY / LEANTIME_USER_ID" >&2
+        __aigit_info "wrote $dir/.env — fill in LEANTIME_BASE_URL / LEANTIME_API_KEY / LEANTIME_USER_ID"
     end
     rm -rf $tmp
 
-    echo "ai-git-fish: installing node deps (tsx, dotenv)..." >&2
+    __aigit_step "Installing node deps (tsx, dotenv)"
     set -l prev $PWD
     cd $dir
     npm install --no-audit --no-fund >/dev/null 2>&1
     set -l rc $status
     cd $prev
     if test $rc -ne 0
-        echo "ai-git-fish: 'npm install' failed in $dir" >&2
+        __aigit_err "'npm install' failed in $dir"
         return 1
     end
-    echo "ai-git-fish: backend ready. Set DEEPSEEK_API_KEY and edit $dir/.env to finish." >&2
+    __aigit_ok "backend ready — run 'aigit config' to finish setup"
 end
 
 function __ai_git_fish_install --on-event ai-git-fish_install
@@ -75,7 +75,8 @@ function __ai_git_fish_update --on-event ai-git-fish_update
 end
 
 function __ai_git_fish_uninstall --on-event ai-git-fish_uninstall
+    set -l dir (__ai_git_fish_dir)
     functions -e __ai_git_fish_dir __ai_git_fish_bootstrap
     set -e AI_GIT_FISH_REPO AI_GIT_FISH_BRANCH
-    echo "ai-git-fish: left "(__ai_git_fish_dir)" in place (holds your .env). Remove it manually if you want." >&2
+    __aigit_info "left $dir in place (holds your .env). Run 'aigit uninstall' or delete it manually."
 end

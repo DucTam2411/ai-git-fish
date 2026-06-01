@@ -38,14 +38,14 @@ function aicommit --description 'Generate conventional commit msg from staged di
 
     # --- secret scan before anything leaves the machine ---
     if type -q gitleaks
-        echo "aicommit: scanning staged changes with gitleaks..." >&2
+        __aigit_step "Scanning staged changes for secrets (gitleaks)"
         if not gitleaks protect --staged --no-banner --redact >/dev/null 2>&1
-            echo "aicommit: gitleaks found potential secrets in staged changes. Aborting (not sending to API)." >&2
-            echo "          run 'gitleaks protect --staged --verbose' to inspect." >&2
+            __aigit_err "gitleaks found potential secrets — aborting (nothing sent to API)"
+            __aigit_info "run 'gitleaks protect --staged --verbose' to inspect"
             return 1
         end
     else
-        echo "aicommit: gitleaks not installed — skipping secret scan" >&2
+        __aigit_warn "gitleaks not installed — skipping secret scan"
     end
 
     # --- truncate oversized diff to keep token use sane ---
@@ -75,7 +75,7 @@ function aicommit --description 'Generate conventional commit msg from staged di
         test -n "$from_hint"; and set ticket "$from_hint"
     end
     if test -z "$ticket"; and type -q fzf; and type -q npx
-        echo "aicommit: no ticket in branch '$branch' — pick one to switch onto a ticket branch" >&2
+        __aigit_step "No ticket in branch '$branch' — pick one to switch onto a ticket branch"
         set ticket (__leantime_pick)
         # Move the staged changes onto a proper ticket branch, then commit there.
         # git switch carries the staged index over (aborts cleanly on conflict).
@@ -83,7 +83,7 @@ function aicommit --description 'Generate conventional commit msg from staged di
             if aibranch feat $ticket
                 set branch (git rev-parse --abbrev-ref HEAD 2>/dev/null)
             else
-                echo "aicommit: branch switch failed — committing on '$branch', labeling [#$ticket]" >&2
+                __aigit_warn "branch switch failed — committing on '$branch', labeling [#$ticket]"
             end
         end
     end
@@ -95,7 +95,7 @@ function aicommit --description 'Generate conventional commit msg from staged di
         test -z "$script_dir"
         and set script_dir ~/.config/fish/leantime
         if test -d "$script_dir"
-            echo "aicommit: fetching ticket #$ticket for context..." >&2
+            __aigit_info "fetching ticket #$ticket for context…"
             # fish command-sub shares cwd (no subshell) -> save + restore pwd around the cd.
             set -l prev $PWD
             cd $script_dir
@@ -151,7 +151,7 @@ Author hint (prioritize this intent and weave it into the message): $hint"
         '{model:"deepseek-chat", stream:false, temperature:0.3,
           messages:[{role:"system",content:$sys},{role:"user",content:$user}]}')
 
-    echo "aicommit: asking DeepSeek..." >&2
+    __aigit_step "Asking DeepSeek for a commit message…"
 
     set -l resp (curl -sS https://api.deepseek.com/chat/completions \
         -H "Content-Type: application/json" \
@@ -159,21 +159,21 @@ Author hint (prioritize this intent and weave it into the message): $hint"
         -d "$payload")
 
     if test $status -ne 0
-        echo "aicommit: request failed" >&2
+        __aigit_err "request failed"
         return 1
     end
 
     # --- API error? ---
     set -l err (echo $resp | jq -r '.error.message // empty')
     if test -n "$err"
-        echo "aicommit: API error: $err" >&2
+        __aigit_err "API error: $err"
         return 1
     end
 
     # string collect keeps the multi-line message as ONE string (newlines intact)
     set -l msg (printf '%s' $resp | jq -r '.choices[0].message.content // empty' | string collect)
     if test -z "$msg"
-        echo "aicommit: empty response from DeepSeek" >&2
+        __aigit_err "empty response from DeepSeek"
         echo $resp >&2
         return 1
     end
@@ -201,15 +201,15 @@ Author hint (prioritize this intent and weave it into the message): $hint"
     set -l subject (printf '%s\n' $msg | string split \n)[1]
     set -l tasks (printf '%s\n' $msg | string match -r '^\s*[-*]\s+.+' | string replace -r '^\s*[-*]\s+' '')
 
-    echo ""
-    echo "  📝 $subject"
-    echo ""
+    echo "" >&2
+    echo "  $(__aigit_col -o green)📝 $subject$(__aigit_col normal)" >&2
+    echo "" >&2
 
     if test (count $tasks) -gt 0
         printf '%s\n' $tasks | python3 (dirname (status filename))/aicommit_grid.py
     end
-    echo ""
-    read -l -P "Commit with this message? [y/N/e=edit] " answer
+    echo "" >&2
+    read -l -P "  $(__aigit_col -o cyan)?$(__aigit_col normal) Commit with this message? [y/N/e=edit] " answer
 
     switch $answer
         case e E
@@ -220,7 +220,7 @@ Author hint (prioritize this intent and weave it into the message): $hint"
         case y Y yes
             printf '%s\n' $msg | git commit -F -
         case '*'
-            echo "aicommit: aborted" >&2
+            __aigit_warn "aborted"
             return 1
     end
 end

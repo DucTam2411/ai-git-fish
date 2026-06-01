@@ -30,13 +30,13 @@ function aipr --description 'Create or update a GitHub PR with an AI summary + l
 
     # --- make sure the branch is on the remote (gh needs it pushed) ---
     if not git rev-parse --abbrev-ref '@{upstream}' >/dev/null 2>&1
-        echo "aipr: pushing '$branch' to origin..." >&2
+        __aigit_step "Pushing '$branch' to origin"
         if not git push -u origin HEAD
-            echo "aipr: push failed" >&2
+            __aigit_err "push failed"
             return 1
         end
     else
-        echo "aipr: syncing '$branch' to origin..." >&2
+        __aigit_step "Syncing '$branch' to origin"
         git push >/dev/null 2>&1
     end
 
@@ -63,7 +63,7 @@ function aipr --description 'Create or update a GitHub PR with an AI summary + l
     set -l ticket_ctx ""
     set -l ticket_md ""
     if test -n "$ticket"; and type -q npx; and test -d "$script_dir"
-        echo "aipr: fetching ticket #$ticket..." >&2
+        __aigit_info "fetching ticket #$ticket…"
         set -l prev $PWD
         cd $script_dir
         set ticket_ctx (npx --no-install tsx src/pick-ticket.ts context $ticket 2>/dev/null | string collect)
@@ -125,19 +125,19 @@ Author hint (prioritize this intent): $hint"
         '{model:"deepseek-chat", stream:false, temperature:0.3,
           messages:[{role:"system",content:$sys},{role:"user",content:$user}]}')
 
-    echo "aipr: asking DeepSeek..." >&2
+    __aigit_step "Asking DeepSeek for a PR title + body…"
     set -l resp (curl -sS https://api.deepseek.com/chat/completions \
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer $DEEPSEEK_API_KEY" \
         -d "$payload")
     set -l err (echo $resp | jq -r '.error.message // empty')
     if test -n "$err"
-        echo "aipr: API error: $err" >&2
+        __aigit_err "API error: $err"
         return 1
     end
     set -l out (printf '%s' $resp | jq -r '.choices[0].message.content // empty' | string collect)
     if test -z "$out"
-        echo "aipr: empty response from DeepSeek" >&2
+        __aigit_err "empty response from DeepSeek"
         return 1
     end
     # strip stray code fences
@@ -175,22 +175,23 @@ $ticket_md"
     # --- existing PR for this branch? ---
     set -l pr_url (gh pr view --json url -q '.url' 2>/dev/null)
 
-    echo ""
-    echo "  ───────────────────────────────────────────────"
-    echo "  $branch  →  $base"
+    set -l c (__aigit_col -o brmagenta); set -l n (__aigit_col normal)
+    echo "" >&2
+    echo "$c  ────────────────────────────────────────────────$n" >&2
+    echo "  $c$branch$n  →  $base" >&2
     if test -n "$pr_url"
-        echo "  PR exists: $pr_url  (will UPDATE)"
+        echo "  $(__aigit_col yellow)PR exists$n: $pr_url  (will UPDATE)" >&2
     else
-        echo "  No PR yet  (will CREATE)"
+        echo "  $(__aigit_col green)No PR yet$n  (will CREATE)" >&2
     end
-    echo "  ───────────────────────────────────────────────"
-    echo ""
-    echo "  📌 $title"
-    echo ""
-    printf '%s\n' $full_body | sed 's/^/  │ /'
-    echo ""
+    echo "$c  ────────────────────────────────────────────────$n" >&2
+    echo "" >&2
+    echo "  $(__aigit_col -o cyan)📌 $title$n" >&2
+    echo "" >&2
+    printf '%s\n' $full_body | sed "s/^/  $c│$n /" >&2
+    echo "" >&2
 
-    read -l -P "Proceed? [y/N/e=edit body] " answer
+    read -l -P "  $(__aigit_col -o cyan)?$(__aigit_col normal) Proceed? [y/N/e=edit body] " answer
     set -l tmp (mktemp)
     printf '%s\n' $full_body > $tmp
     switch $answer
@@ -202,7 +203,7 @@ $ticket_md"
         case y Y yes
             # keep body as-is
         case '*'
-            echo "aipr: aborted" >&2
+            __aigit_warn "aborted"
             rm -f $tmp
             return 1
     end
@@ -210,7 +211,7 @@ $ticket_md"
     # --- create or update ---
     if test -n "$pr_url"
         gh pr edit --title "$title" --body-file $tmp
-        and echo "aipr: updated $pr_url"
+        and __aigit_ok "updated $pr_url"
     else
         gh pr create --base $base --head $branch --title "$title" --body-file $tmp
     end

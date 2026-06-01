@@ -2,7 +2,7 @@ function aibranch --description 'Pick a Leantime ticket and create/switch a git 
     # Usage: aibranch [type] [ticket_id]   (type defaults to feat: feat|fix|chore|...)
     #        ticket_id given -> skip the picker (aicommit passes an already-picked id).
     if not git rev-parse --is-inside-work-tree >/dev/null 2>&1
-        echo "aibranch: not a git repo" >&2
+        __aigit_err "aibranch: not a git repo"
         return 1
     end
 
@@ -29,16 +29,16 @@ function aibranch --description 'Pick a Leantime ticket and create/switch a git 
 
     # Already on it? nothing to do.
     if test (git rev-parse --abbrev-ref HEAD 2>/dev/null) = "$branch"
-        echo "aibranch: already on $branch" >&2
+        __aigit_info "already on $branch"
         return 0
     end
 
     # Branch exists (any matching ref) → switch to it. Else create.
     if git show-ref --verify --quiet "refs/heads/$branch"
-        echo "aibranch: switching to existing branch $branch" >&2
+        __aigit_step "Switching to existing branch $branch"
         git switch $branch
     else
-        echo "aibranch: creating branch $branch" >&2
+        __aigit_step "Creating branch $branch"
         git switch -c $branch
     end
 end

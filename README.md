@@ -84,6 +84,18 @@ aibranch fix                             # pick ticket -> fix/1234-slug
 aipr "focus on the migration"            # open / update the GitHub PR
 ```
 
+## Manage
+
+```sh
+aigit update      # pull the latest plugin + backend (fisher update + npm i)
+aigit config      # re-enter Leantime creds and re-pick your user id
+aigit uninstall   # remove the plugin, optionally the backend dir + DEEPSEEK key
+aigit version     # show repo / backend / fisher status
+aigit help
+```
+
+`aigit update` / `aigit uninstall` wrap `fisher update` / `fisher remove` and add the backend cleanup (`.env`, node deps, the universal `DEEPSEEK_API_KEY`).
+
 ## How it bootstraps
 
 Fisher only installs `functions/`, `completions/`, `conf.d/`. The Leantime picker is a small TypeScript project (`leantime/`), so `conf.d/ai-git-fish.fish` fetches it on `fisher install` / `fisher update` and runs `npm install`. To re-run manually:

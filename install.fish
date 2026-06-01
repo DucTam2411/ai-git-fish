@@ -9,10 +9,18 @@
 set -g REPO DucTam2411/ai-git-fish
 set -g BRANCH main
 
-function _hd;   set_color -o cyan;   echo ""; echo "▸ $argv"; set_color normal; end
-function _ok;   set_color green;     echo "  ✓ $argv"; set_color normal; end
-function _warn; set_color yellow;    echo "  ! $argv" >&2; set_color normal; end
-function _err;  set_color -o red;    echo "  ✗ $argv" >&2; set_color normal; end
+function _hd;   set_color -o cyan;   echo ""; echo "❯ $argv"; set_color normal; end
+function _ok;   echo "  "(set_color green)"✓"(set_color normal)" $argv"; end
+function _warn; echo "  "(set_color -o yellow)"▲"(set_color normal)" $argv" >&2; end
+function _err;  echo "  "(set_color -o red)"✗"(set_color normal)" $argv" >&2; end
+function _banner
+    set -l c (set_color -o brmagenta); set -l d (set_color brblack); set -l n (set_color normal)
+    echo ""
+    echo "$c  ╭─ ✨ ai-git-fish ───────────────────────────╮$n"
+    printf '%s  │  %s%-42s%s│%s\n' "$c" "$d" "guided installer" "$c" "$n"
+    echo "$c  ╰────────────────────────────────────────────╯$n"
+end
+_banner
 function _ask # _ask "prompt" default-yes?
     set -l suffix "[y/N]"; test "$argv[2]" = yes; and set suffix "[Y/n]"
     read -l -P "  $argv[1] $suffix " r
