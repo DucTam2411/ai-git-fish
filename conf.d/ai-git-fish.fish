@@ -13,7 +13,16 @@ function __ai_git_fish_dir
     echo $d
 end
 
+# During `fisher install/update` the event handlers run before conf.d is re-sourced,
+# so the __aigit_* UI helpers may not be defined yet. Source the sibling lib on demand.
+function __ai_git_fish_ui
+    functions -q __aigit_step; and return 0
+    set -l here (dirname (status current-filename))
+    test -f "$here/aigit_ui.fish"; and source "$here/aigit_ui.fish"
+end
+
 function __ai_git_fish_bootstrap --description 'Download + install the Leantime backend'
+    __ai_git_fish_ui
     set -l dir (__ai_git_fish_dir)
     for dep in tar npm
         if not type -q $dep
@@ -75,6 +84,7 @@ function __ai_git_fish_update --on-event ai-git-fish_update
 end
 
 function __ai_git_fish_uninstall --on-event ai-git-fish_uninstall
+    __ai_git_fish_ui
     set -l dir (__ai_git_fish_dir)
     functions -e __ai_git_fish_dir __ai_git_fish_bootstrap
     set -e AI_GIT_FISH_REPO AI_GIT_FISH_BRANCH
