@@ -33,12 +33,33 @@ function aibranch --description 'Pick a Leantime ticket and create/switch a git 
         return 0
     end
 
-    # Branch exists (any matching ref) → switch to it. Else create.
+    # Branch exists → append ordinal suffix (-2nd, -3rd, ...) until free.
     if git show-ref --verify --quiet "refs/heads/$branch"
-        __aigit_step "Switching to existing branch $branch"
-        git switch $branch
-    else
-        __aigit_step "Creating branch $branch"
-        git switch -c $branch
+        set -l n 2
+        while git show-ref --verify --quiet "refs/heads/$branch-"(__aibranch_ordinal $n)
+            set n (math $n + 1)
+        end
+        set branch "$branch-"(__aibranch_ordinal $n)
+    end
+
+    __aigit_step "Creating branch $branch"
+    git switch -c $branch
+end
+
+function __aibranch_ordinal --argument-names n
+    switch (math $n % 100)
+        case 11 12 13
+            echo "$n"th
+            return
+    end
+    switch (math $n % 10)
+        case 1
+            echo "$n"st
+        case 2
+            echo "$n"nd
+        case 3
+            echo "$n"rd
+        case '*'
+            echo "$n"th
     end
 end
