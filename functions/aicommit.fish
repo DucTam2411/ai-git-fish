@@ -31,9 +31,18 @@ function aicommit --description 'Generate conventional commit msg from staged di
 
     set -l diff (git diff --cached --no-color -- . $excludes | string collect)
 
+    # lockfile-only changes produce an empty code diff above; detect them so we can
+    # still make a deterministic chore(deps) commit instead of bailing out.
+    set -l lockfiles (git diff --cached --name-only -- '*.lock' 'pnpm-lock.yaml' 'package-lock.json' 'yarn.lock')
+    set -l deps_only 0
+
     if test -z "$diff"
-        echo "aicommit: no staged code changes (stage with 'git add' first)" >&2
-        return 1
+        if test -n "$lockfiles"
+            set deps_only 1
+        else
+            echo "aicommit: no staged code changes (stage with 'git add' first)" >&2
+            return 1
+        end
     end
 
     # --- secret scan before anything leaves the machine ---
@@ -96,6 +105,19 @@ function aicommit --description 'Generate conventional commit msg from staged di
         return 1
     end
 
+    # message is built either by the LLM (code changes) or deterministically (deps-only)
+    set -l msg ""
+
+    if test $deps_only -eq 1
+        # lockfile-only: no diff to summarize, write a deterministic chore(deps) message
+        set -l basenames (string replace -r '.*/' '' -- $lockfiles)
+        set msg "chore(deps): update "(string join ', ' -- $basenames)"
+"
+        for f in $lockfiles
+            set msg "$msg
+- bump dependencies in $f"
+        end
+    else
     # --- fetch ticket content (headline + description) to focus the LLM ---
     set -l ticket_ctx ""
     if test -n "$ticket"; and type -q npx
@@ -179,7 +201,7 @@ Author hint (prioritize this intent and weave it into the message): $hint"
     end
 
     # string collect keeps the multi-line message as ONE string (newlines intact)
-    set -l msg (printf '%s' $resp | jq -r '.choices[0].message.content // empty' | string collect)
+    set msg (printf '%s' $resp | jq -r '.choices[0].message.content // empty' | string collect)
     if test -z "$msg"
         __aigit_err "empty response from DeepSeek"
         echo $resp >&2
@@ -188,6 +210,7 @@ Author hint (prioritize this intent and weave it into the message): $hint"
 
     # --- strip stray code fences if model added them ---
     set msg (printf '%s' $msg | string replace -r '^```[a-z]*\n?' '' | string replace -r '\n?```$' '' | string collect)
+    end
 
     # inject [#id] right after "type(scope): " in the subject line (skip if already present)
     # ($ticket already resolved before the LLM call above)
