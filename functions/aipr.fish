@@ -172,8 +172,8 @@ Author hint (prioritize this intent): $hint"
 $ticket_md"
     end
 
-    # --- existing PR for this branch? ---
-    set -l pr_url (gh pr view --json url -q '.url' 2>/dev/null)
+    # --- existing OPEN PR for this branch? (ignore merged/closed so we create a fresh one) ---
+    set -l pr_url (gh pr view --json url,state -q 'select(.state == "OPEN") | .url' 2>/dev/null)
 
     set -l c (__aigit_col -o brmagenta); set -l n (__aigit_col normal)
     echo "" >&2
