@@ -1,20 +1,37 @@
 import 'dotenv/config'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
-import { fetchAllTickets, fetchUsers, type LeantimeTicket } from './leantime.js'
+import { fetchAllTickets, fetchStatusLabels, fetchUsers, type LeantimeTicket } from './leantime.js'
 
 // Shared cache dir. fzf preview reads pre-rendered <id>.txt from here (instant, no re-fetch).
 const CACHE_DIR = '/tmp/leantime-pick'
 const LEANTIME_BASE_URL = process.env.LEANTIME_BASE_URL ?? 'https://leantime.anymateme.store'
 
-// Leantime status int → label. Extend as ids are confirmed.
-const STATUS_LABEL: Record<string, string> = {
-  '3': 'Done',
-  '1': 'In Progress',
-  '0': 'To Do',
+// Leantime's built-in defaults, used only if the dynamic fetch fails. Status ids
+// are configurable per instance, so getStatusLabels() is the real source of truth.
+const STATUS_LABEL_FALLBACK: Record<string, string> = {
+  '0': 'Done',
+  '1': 'Blocked',
+  '2': 'Waiting for Approval',
+  '3': 'New',
+  '4': 'In Progress',
+  '-1': 'Archived',
 }
-function statusLabel(t: any): string {
+let statusLabelCache: Record<string, string> | null = null
+async function loadStatusLabels(): Promise<Record<string, string>> {
+  if (statusLabelCache) return statusLabelCache
+  try {
+    const raw = await fetchStatusLabels()
+    const map: Record<string, string> = {}
+    for (const [id, def] of Object.entries(raw)) if (def?.name) map[id] = def.name
+    if (Object.keys(map).length) return (statusLabelCache = map)
+  } catch {
+    // fall through to defaults
+  }
+  return STATUS_LABEL_FALLBACK
+}
+function statusLabel(t: any, labels: Record<string, string> = STATUS_LABEL_FALLBACK): string {
   const raw = String(t.status ?? '')
-  return STATUS_LABEL[raw] ?? (raw ? `status ${raw}` : 'unknown')
+  return labels[raw] ?? STATUS_LABEL_FALLBACK[raw] ?? (raw ? `status ${raw}` : 'unknown')
 }
 
 // Common named HTML entities seen in Leantime descriptions. &amp; is decoded last.
@@ -67,7 +84,7 @@ function fmtDate(s?: string | null): string {
   return isZeroDate(s) ? '—' : String(s).split(' ')[0]
 }
 
-function previewText(t: any): string {
+function previewText(t: any, labels?: Record<string, string>): string {
   const head = String(t.headline ?? '').replace(/\s+/g, ' ').trim()
   const url = `${LEANTIME_BASE_URL.replace(/\/$/, '')}/#/tickets/showTicket/${t.id}`
   const body = stripHtml(String(t.description ?? '')) || '(no description)'
@@ -76,7 +93,7 @@ function previewText(t: any): string {
     '─'.repeat(48),
     `Project : ${t.projectName ?? '—'}`,
     `Assignee: ${t.editorFirstname ?? '—'} (id ${t.editorId ?? '—'})`,
-    `Status  : ${statusLabel(t)}`,
+    `Status  : ${statusLabel(t, labels)}`,
     `Due     : ${fmtDate(t.dateToFinish)}`,
     `Created : ${fmtDate(t.date)}`,
     `Link    : ${url}`,
@@ -98,13 +115,14 @@ async function fetchMine(limit: number): Promise<LeantimeTicket[]> {
 // `pick-ticket.ts <id>` → resolve one ticket: write its preview cache, print headline.
 // Used by aibranch/aipr to label a branch/PR even when the id is outside the newest-30 list.
 async function resolveOne(id: string) {
-  const t = (await fetchAllTickets()).find((x) => String(x.id) === String(id)) as any
+  const [labels, tickets] = await Promise.all([loadStatusLabels(), fetchAllTickets()])
+  const t = tickets.find((x) => String(x.id) === String(id)) as any
   if (!t) {
     console.error(`pick-ticket: ticket ${id} not found`)
     process.exit(1)
   }
   mkdirSync(CACHE_DIR, { recursive: true })
-  writeFileSync(`${CACHE_DIR}/${id}.txt`, previewText(t))
+  writeFileSync(`${CACHE_DIR}/${id}.txt`, previewText(t, labels))
   process.stdout.write(`${String(t.headline ?? '').replace(/\s+/g, ' ').trim()}\n`)
 }
 
@@ -127,7 +145,8 @@ async function printContext(id: string) {
 //   see the ticket inline on GitHub AND get a click-through link to Leantime.
 // Prints nothing (exit 0) if the ticket isn't found, so aipr degrades gracefully.
 async function printMarkdown(id: string) {
-  const t = (await fetchAllTickets()).find((x) => String(x.id) === String(id)) as any
+  const [labels, tickets] = await Promise.all([loadStatusLabels(), fetchAllTickets()])
+  const t = tickets.find((x) => String(x.id) === String(id)) as any
   if (!t) return
   const head = String(t.headline ?? '').replace(/\s+/g, ' ').trim()
   const url = `${LEANTIME_BASE_URL.replace(/\/$/, '')}/#/tickets/showTicket/${id}`
@@ -138,7 +157,7 @@ async function printMarkdown(id: string) {
     .split('\n')
     .map((l) => (l.trim() ? `> ${l}` : '>'))
     .join('\n')
-  const meta = `> **Status:** ${statusLabel(t)}  •  **Assignee:** ${t.editorFirstname ?? '—'}  •  **Due:** ${fmtDate(t.dateToFinish)}`
+  const meta = `> **Status:** ${statusLabel(t, labels)}  •  **Assignee:** ${t.editorFirstname ?? '—'}  •  **Due:** ${fmtDate(t.dateToFinish)}`
   const block = [
     `### 🎫 Leantime ticket`,
     ``,
@@ -193,14 +212,14 @@ async function main() {
   }
 
   const limit = Number(process.env.LEANTIME_PICK_LIMIT ?? 30)
-  const tickets = await fetchMine(limit)
+  const [labels, tickets] = await Promise.all([loadStatusLabels(), fetchMine(limit)])
 
   rmSync(CACHE_DIR, { recursive: true, force: true })
   mkdirSync(CACHE_DIR, { recursive: true })
 
   const lines: string[] = []
   for (const t of tickets) {
-    writeFileSync(`${CACHE_DIR}/${t.id}.txt`, previewText(t))
+    writeFileSync(`${CACHE_DIR}/${t.id}.txt`, previewText(t, labels))
     const head = String(t.headline ?? '').replace(/\s+/g, ' ').trim()
     // fzf list line: "<id>\t<headline>". Field 1 = id (used by preview + caller).
     lines.push(`${t.id}\t${head}`)

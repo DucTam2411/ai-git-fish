@@ -42,6 +42,56 @@ export async function fetchAllTickets(): Promise<LeantimeTicket[]> {
   return (await rpc<LeantimeTicket[]>('leantime.rpc.tickets.tickets.getAll')) ?? []
 }
 
+export interface LeantimeStatusLabel {
+  name: string
+  [k: string]: unknown
+}
+
+// Status ids are configurable per Leantime instance — always fetch, never hardcode.
+export async function fetchStatusLabels(): Promise<Record<string, LeantimeStatusLabel>> {
+  return (await rpc<Record<string, LeantimeStatusLabel>>('leantime.rpc.tickets.tickets.getStatusLabels')) ?? {}
+}
+
+export interface LeantimeProject {
+  id: number | string
+  name: string
+  [k: string]: unknown
+}
+
+export async function fetchProjects(): Promise<LeantimeProject[]> {
+  return (await rpc<LeantimeProject[]>('leantime.rpc.projects.projects.getAll')) ?? []
+}
+
+export interface LeantimeSprint {
+  id: number | string
+  name: string
+  projectId: number | string
+  startDate?: string
+  endDate?: string
+  [k: string]: unknown
+}
+
+export async function fetchAllSprints(): Promise<LeantimeSprint[]> {
+  return (await rpc<LeantimeSprint[]>('leantime.rpc.sprints.sprints.getAllSprints')) ?? []
+}
+
+export interface NewTicketValues {
+  headline: string
+  projectId: number | string
+  editorId: number | string
+  type?: string
+  description?: string
+  priority?: number | string
+  status?: number | string
+  sprint?: number | string
+}
+
+// Returns the new ticket id.
+export async function createTicket(values: NewTicketValues): Promise<number> {
+  const result = await rpc<number[]>('leantime.rpc.tickets.tickets.addTicket', { values })
+  return Number(result[0])
+}
+
 // Used by the installer to pick a LEANTIME_USER_ID. Tries a few known method
 // names so it survives minor Leantime version differences.
 export async function fetchUsers(): Promise<LeantimeUser[]> {

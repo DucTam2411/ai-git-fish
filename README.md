@@ -7,6 +7,7 @@ AI-assisted git for [fish](https://fishshell.com). Three functions, powered by D
 | `aicommit [hint]` | Generate a Conventional Commit message from your **staged** diff, preview it, commit on confirm. |
 | `aibranch [type]` | fzf-pick a Leantime ticket assigned to you, create/switch to `type/<id>-<slug>` (default `type` = `feat`). |
 | `aipr [hint]` | Push the branch, write a PR title + markdown body from your commits, link the Leantime ticket, create or update the GitHub PR. |
+| `aitask [headline]` | Create a Leantime task: fzf-pick project, fzf-pick sprint, create the ticket. |
 
 All three auto-detect a ticket id from the branch name (`\d{3,}`), an `AICOMMIT_TICKET` / `AIPR_TICKET` env var, a `#1234` in your hint, or an fzf picker.
 
@@ -82,6 +83,8 @@ aicommit "drop the debug logging"        # preview + commit
 aibranch fix                             # pick ticket -> fix/1234-slug
 
 aipr "focus on the migration"            # open / update the GitHub PR
+
+aitask "fix flaky login test"            # pick project -> pick sprint -> create task
 ```
 
 ## Manage
