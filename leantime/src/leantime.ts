@@ -92,6 +92,16 @@ export async function createTicket(values: NewTicketValues): Promise<number> {
   return Number(result[0])
 }
 
+// updateTicket 500s with "project id is not set" unless projectId is included
+// even though we're only changing status — Leantime re-validates project access.
+export async function updateTicketStatus(
+  id: number | string,
+  projectId: number | string,
+  status: number | string
+): Promise<void> {
+  await rpc('leantime.rpc.tickets.tickets.updateTicket', { values: { id, projectId, status } })
+}
+
 // Used by the installer to pick a LEANTIME_USER_ID. Tries a few known method
 // names so it survives minor Leantime version differences.
 export async function fetchUsers(): Promise<LeantimeUser[]> {

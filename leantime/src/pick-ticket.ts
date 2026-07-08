@@ -217,13 +217,18 @@ async function main() {
   rmSync(CACHE_DIR, { recursive: true, force: true })
   mkdirSync(CACHE_DIR, { recursive: true })
 
+  // Pad status labels into a fixed-width column so headlines line up in fzf.
+  const statuses = tickets.map((t) => statusLabel(t, labels))
+  const statusWidth = Math.max(0, ...statuses.map((s) => s.length))
+
   const lines: string[] = []
-  for (const t of tickets) {
+  tickets.forEach((t, i) => {
     writeFileSync(`${CACHE_DIR}/${t.id}.txt`, previewText(t, labels))
     const head = String(t.headline ?? '').replace(/\s+/g, ' ').trim()
-    // fzf list line: "<id>\t<headline>". Field 1 = id (used by preview + caller).
-    lines.push(`${t.id}\t${head}`)
-  }
+    const status = `[${statuses[i].padEnd(statusWidth)}]`
+    // fzf list line: "<id>\t<status column> <headline>". Field 1 = id (used by preview + caller).
+    lines.push(`${t.id}\t${status} ${head}`)
+  })
 
   process.stdout.write(lines.length ? `${lines.join('\n')}\n` : '')
 }
