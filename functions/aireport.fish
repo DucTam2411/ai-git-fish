@@ -79,8 +79,7 @@ function aireport --description 'aireport <hours> [YYYY-MM-DD] — AI daily repo
     end
     # commit-author name can differ from the gh login (e.g. "Duc Tam" vs "DucTam2411"),
     # and local git config may not have user.name set at all — fall back through
-    # local -> global -> gh profile -> gh login so we always have SOME display name,
-    # and match commit authors against every known identity, not just one.
+    # local -> global -> gh profile -> gh login so we always have SOME display name.
     set -l git_name (git config user.name)
     test -z "$git_name"; and set git_name (git config --global user.name 2>/dev/null)
     set -l gh_name (gh api user -q '.name // empty' 2>/dev/null)
@@ -88,9 +87,27 @@ function aireport --description 'aireport <hours> [YYYY-MM-DD] — AI daily repo
     test -z "$display_name"; and set display_name $gh_name
     test -z "$display_name"; and set display_name $gh_login
 
+    # email is the reliable identity — git config user.name is often unset per-machine,
+    # but the commit author *email* stays consistent. Match on email first, name second.
+    set -l git_email (git config user.email)
+    test -z "$git_email"; and set git_email (git config --global user.email 2>/dev/null)
+    set -l gh_email (gh api user -q '.email // empty' 2>/dev/null)
+
     set -l my_identities
-    for id in $git_name $gh_name $gh_login
+    for id in $git_name $gh_name $gh_login $git_email $gh_email
         test -n "$id"; and not contains -- $id $my_identities; and set -a my_identities $id
+    end
+
+    # last-resort fuzzy fallback: strip everything but letters/digits, lowercase, and
+    # check substring either way (e.g. "Duc Tam" -> "ductam" is a prefix of gh login
+    # "DucTam2411" -> "ductam2411").
+    function __aireport_norm --no-scope-shadowing
+        string lower (string replace -ra '[^A-Za-z0-9]' '' -- $argv[1])
+    end
+    set -l my_norms
+    for id in $my_identities
+        set -l n (__aireport_norm $id)
+        test (string length $n) -ge 4; and set -a my_norms $n
     end
 
     __aigit_step "Scanning $day for merges by $gh_login…"
@@ -113,11 +130,22 @@ function aireport --description 'aireport <hours> [YYYY-MM-DD] — AI daily repo
         set -l pr_num (string match -rg 'pull request #(\d+)' -- $subject)
         test -z "$pr_num"; and continue
 
-        # who actually authored the commits inside this merge?
+        # who actually authored the commits inside this merge? check name, email, and
+        # a normalized fuzzy match, in that order of confidence.
         set -l authors (git log --pretty=format:'%an' "$hash^1..$hash^2" 2>/dev/null | sort -u)
+        set -l author_emails (git log --pretty=format:'%ae' "$hash^1..$hash^2" 2>/dev/null | sort -u)
         set -l is_mine 0
-        for a in $authors
+        for a in $authors $author_emails
             contains -- $a $my_identities; and set is_mine 1
+        end
+        if test $is_mine -eq 0
+            for a in $authors
+                set -l n (__aireport_norm $a)
+                for mn in $my_norms
+                    string match -q "*$mn*" -- $n; or string match -q "*$n*" -- $mn
+                    and set is_mine 1
+                end
+            end
         end
 
         if test $is_mine -eq 1
