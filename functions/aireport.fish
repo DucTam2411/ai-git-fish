@@ -77,8 +77,21 @@ function aireport --description 'aireport <hours> [YYYY-MM-DD] — AI daily repo
         __aigit_err "aireport: could not resolve gh user"
         return 1
     end
-    # commit-level author name may differ from the gh login (e.g. "Duc Tam" vs "DucTam2411")
+    # commit-author name can differ from the gh login (e.g. "Duc Tam" vs "DucTam2411"),
+    # and local git config may not have user.name set at all — fall back through
+    # local -> global -> gh profile -> gh login so we always have SOME display name,
+    # and match commit authors against every known identity, not just one.
     set -l git_name (git config user.name)
+    test -z "$git_name"; and set git_name (git config --global user.name 2>/dev/null)
+    set -l gh_name (gh api user -q '.name // empty' 2>/dev/null)
+    set -l display_name $git_name
+    test -z "$display_name"; and set display_name $gh_name
+    test -z "$display_name"; and set display_name $gh_login
+
+    set -l my_identities
+    for id in $git_name $gh_name $gh_login
+        test -n "$id"; and not contains -- $id $my_identities; and set -a my_identities $id
+    end
 
     __aigit_step "Scanning $day for merges by $gh_login…"
 
@@ -104,7 +117,7 @@ function aireport --description 'aireport <hours> [YYYY-MM-DD] — AI daily repo
         set -l authors (git log --pretty=format:'%an' "$hash^1..$hash^2" 2>/dev/null | sort -u)
         set -l is_mine 0
         for a in $authors
-            test "$a" = "$git_name"; and set is_mine 1
+            contains -- $a $my_identities; and set is_mine 1
         end
 
         if test $is_mine -eq 1
@@ -149,22 +162,25 @@ OUTPUT FORMAT (markdown, match exactly this style):
 - <forward-looking bullet>
 
 RULES:
-- Total of all <est>h values in 'What I'm working on' MUST sum to exactly $hours hours (the user-given total for the day). Distribute realistically based on how much each PR actually contains (bigger PR body / more changes = more hours).
+- The input has TWO clearly separate sections: 'PRs authored by <name>' (real work, own code) and 'PRs merged/reviewed only' (someone else's code, <name> just approved/merged it). Treat them as mutually exclusive — never move an item between sections.
+- Every PR in the 'authored by <name>' section MUST get its own top-level task line (or be grouped with other authored PRs on the SAME ticket into one line) under 'What I'm working on'. Do NOT fold authored work into the review bucket, even if it's a small PR.
+- ALL PRs in the 'merged/reviewed only' section go together into exactly ONE line: 'Review & merge PR: <short comma list, each tagged with its actual author name>' — this line must contain ONLY items from that section, nothing from the authored section.
+- <name> in the output header/title is the literal name given as 'Name:' below — always fill it in, never leave it blank.
+- Total of all <est>h values in 'What I'm working on' MUST sum to exactly $hours hours (the user-given total for the day). Distribute realistically based on how much each PR actually contains (bigger PR body / more changes = more hours). The review-bucket line typically gets a small flat amount (e.g. 0.5-1h), the rest goes to authored work.
 - Every task is finished today unless told otherwise, so <remaining>h is always 0h.
 - Group all PRs for the SAME underlying feature/ticket into ONE task line with sub-bullets, even if they came from separate PRs — read every PR body fully to extract the real user-facing outcome.
 - Rewrite technical PR content in plain language a non-engineer understands: say what changed for the user/product, not implementation details (no file names, function names, library names, component names).
-- PRs the person only reviewed/merged (not authored) go into ONE separate line: 'Review & merge PR: <short list>' — do not describe their internals in depth, just name what each was about and (author) credit.
 - Do not invent work that isn't in the input.
 - Keep it concise — this is a daily report, not documentation."
 
-    set -l user "Name: $git_name
+    set -l user "Name: $display_name
 Date: $day
 Total hours for the day: $hours
 
-=== PRs authored by $git_name (real work — read fully) ===
+=== PRs authored by $display_name (real work — read fully, each needs its own task line) ===
 $own_block
 
-=== PRs merged/reviewed only (not authored by $git_name) ===
+=== PRs merged/reviewed only (not authored by $display_name) ===
 $reviewed_block"
 
     set -l payload (jq -n --arg sys "$sys" --arg user "$user" \
