@@ -1,4 +1,11 @@
-function __aireport_pick_date --description 'fzf day picker, last 60 days, today pre-selected at top'
+function __aireport_cal_line --description 'internal: print the month grid for a YYYY-MM-DD (used as fzf preview)'
+    set -l d $argv[1]
+    set -l y (date -j -f %Y-%m-%d $d +%Y 2>/dev/null; or date -d $d +%Y)
+    set -l m (date -j -f %Y-%m-%d $d +%m 2>/dev/null; or date -d $d +%-m)
+    cal $m $y
+end
+
+function __aireport_pick_date --description 'fzf day picker with a calendar-grid preview, today pre-selected at top'
     set -l today (date +%Y-%m-%d)
     set -l lines
     for i in (seq 0 59)
@@ -9,9 +16,14 @@ function __aireport_pick_date --description 'fzf day picker, last 60 days, today
         set -a lines $label
     end
     set -l picked (printf '%s\n' $lines | fzf --prompt='date> ' \
-        --header='pick a day for the report (top = today)' \
-        --height=22 --reverse --no-multi)
-    test -z "$picked"; and return 1
+        --header='pick a day for the report (top = today)  |  preview = calendar grid' \
+        --height=22 --reverse --no-multi \
+        --preview 'fish -c "__aireport_cal_line {1}"' \
+        --preview-window=right:32:wrap)
+    set -l rc $status
+    if test $rc -ne 0; or test -z "$picked"
+        return 1
+    end
     string match -rg '^\S+' -- "$picked"
 end
 
@@ -45,10 +57,13 @@ function aireport --description 'aireport <hours> [YYYY-MM-DD] — AI daily repo
     if test -z "$day"
         if type -q fzf
             set day (__aireport_pick_date)
-            or return 1
         else
             set day (date +%Y-%m-%d)
         end
+    end
+    if test -z "$day"
+        __aigit_err "aireport: no date picked, aborting"
+        return 1
     end
 
     set -l gh_login (gh api user -q '.login' 2>/dev/null)
