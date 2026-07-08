@@ -159,8 +159,13 @@ function aireport --description 'aireport <hours> [YYYY-MM-DD] — AI daily repo
 $body"
         else
             __aigit_info "reviewed/merged only: PR #$pr_num — $subject (by $authors)"
+            set -l pr_json (gh pr view $pr_num --json title,body 2>/dev/null)
+            set -l title (echo $pr_json | jq -r '.title // empty')
+            set -l body (echo $pr_json | jq -r '.body // empty')
             set reviewed_block "$reviewed_block
-- PR #$pr_num: $subject (author: $authors)"
+
+### PR #$pr_num (author: $authors): $title
+$body"
         end
     end
 
@@ -170,7 +175,7 @@ $body"
     end
 
     # --- ask DeepSeek to read everything and write a plain-language, non-technical report ---
-    set -l sys "You are writing a daily standup report for a non-technical audience (PM/manager). Input is real PR data for one day: PRs the person authored (full title+body, may be very technical) and PRs they only reviewed/merged (title only, authored by someone else).
+    set -l sys "You are writing a daily standup report for a non-technical audience (PM/manager). Input is real PR data for one day: PRs the person authored (full title+body) and PRs they only reviewed/merged (also full title+body, but authored by someone else — read these fully too, don't just list PR numbers).
 
 OUTPUT FORMAT (markdown, match exactly this style):
 
@@ -192,7 +197,7 @@ OUTPUT FORMAT (markdown, match exactly this style):
 RULES:
 - The input has TWO clearly separate sections: 'PRs authored by <name>' (real work, own code) and 'PRs merged/reviewed only' (someone else's code, <name> just approved/merged it). Treat them as mutually exclusive — never move an item between sections.
 - Every PR in the 'authored by <name>' section MUST get its own top-level task line (or be grouped with other authored PRs on the SAME ticket into one line) under 'What I'm working on'. Do NOT fold authored work into the review bucket, even if it's a small PR.
-- ALL PRs in the 'merged/reviewed only' section go together into exactly ONE line: 'Review & merge PR: <short comma list, each tagged with its actual author name>' — this line must contain ONLY items from that section, nothing from the authored section.
+- ALL PRs in the 'merged/reviewed only' section go together under exactly ONE top-level line: 'Review & merge PR'. Under it, add ONE plain-language sub-bullet PER PR — read that PR's body and summarize what it actually did in a short user-facing sentence, tagged with its real author name, e.g. '- Fixed avatar dialog not closing after selection (khanhld2109)'. Do not just list bare PR numbers — every sub-bullet must say what changed. This line must contain ONLY items from that section, nothing from the authored section.
 - <name> in the output header/title is the literal name given as 'Name:' below — always fill it in, never leave it blank.
 - Total of all <est>h values in 'What I'm working on' MUST sum to exactly $hours hours (the user-given total for the day). Distribute realistically based on how much each PR actually contains (bigger PR body / more changes = more hours). The review-bucket line typically gets a small flat amount (e.g. 0.5-1h), the rest goes to authored work.
 - Every task is finished today unless told otherwise, so <remaining>h is always 0h.
@@ -208,7 +213,7 @@ Total hours for the day: $hours
 === PRs authored by $display_name (real work — read fully, each needs its own task line) ===
 $own_block
 
-=== PRs merged/reviewed only (not authored by $display_name) ===
+=== PRs merged/reviewed only (not authored by $display_name — full body included, summarize each) ===
 $reviewed_block"
 
     set -l payload (jq -n --arg sys "$sys" --arg user "$user" \
