@@ -7,7 +7,7 @@ AI-assisted git for [fish](https://fishshell.com). Three functions, powered by D
 | `aicommit [hint]` | Generate a Conventional Commit message from your **staged** diff, preview it, commit on confirm. |
 | `aibranch [type]` | fzf-pick a Leantime ticket assigned to you, create/switch to `type/<id>-<slug>` (default `type` = `feat`). |
 | `aipr [hint]` | Push the branch, write a PR title + markdown body from your commits, link the Leantime ticket, create or update the GitHub PR. |
-| `aitask [headline]` | Create a Leantime task: fzf-pick project, fzf-pick sprint, create the ticket. |
+| `aitask [headline]` | Create a Leantime task: fzf-pick project, fzf-pick sprint, create the ticket, notify Slack (if configured). |
 
 All three auto-detect a ticket id from the branch name (`\d{3,}`), an `AICOMMIT_TICKET` / `AIPR_TICKET` env var, a `#1234` in your hint, or an fzf picker.
 
@@ -71,6 +71,14 @@ A `conf.d` hook downloads the Leantime backend into `~/.config/fish/leantime` an
    ```
 
 `aicommit` and `aipr` work **without** Leantime — they just skip the ticket section. `aibranch` needs it.
+
+3. **Slack** (optional) — `aitask` posts a "new task created" message to a channel when set. Add to the same `.env`:
+
+   ```ini
+   SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+   ```
+
+   Create an [Incoming Webhook](https://api.slack.com/messaging/webhooks) bound to the channel you want. Without it, `aitask` just skips the notification.
 
 > Never commit keys. `DEEPSEEK_API_KEY` belongs in your shell env; `.env` is gitignored.
 
