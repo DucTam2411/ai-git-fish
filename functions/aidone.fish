@@ -13,6 +13,9 @@ function aidone --description 'fzf-pick a Leantime ticket and mark it Done'
     end
 
     set -l id $argv[1]
+    if test -z "$id"; and git rev-parse --is-inside-work-tree >/dev/null 2>&1
+        set id (string match -rg '(\d{3,})' -- (git rev-parse --abbrev-ref HEAD 2>/dev/null))
+    end
     if test -z "$id"
         set id (__leantime_pick)
         or return 1
