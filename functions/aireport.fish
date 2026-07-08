@@ -30,7 +30,7 @@ function __aireport_pick_date --description 'fzf day picker with a calendar-grid
     if test $rc -ne 0; or test -z "$picked"
         return 1
     end
-    string match -rg '^\S+' -- "$picked"
+    string match -rg '^(\S+)' -- "$picked"
 end
 
 function aireport --description 'aireport <hours> [YYYY-MM-DD] — AI daily report from your real git/PR activity'
