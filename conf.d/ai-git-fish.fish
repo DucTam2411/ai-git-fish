@@ -60,6 +60,16 @@ function __ai_git_fish_bootstrap --description 'Download + install the Leantime 
         cp $extracted/.env.example $dir/.env
         __aigit_info "wrote $dir/.env — fill in LEANTIME_BASE_URL / LEANTIME_API_KEY / LEANTIME_USER_ID"
     end
+
+    # aireport's fzf calendar preview is a plain shell script, not a .fish file —
+    # fisher only installs functions/*.fish, so it never lands via the normal plugin
+    # copy. Deploy it ourselves into fish_function_path[1] where __aireport_cal_script
+    # falls back to looking for it.
+    set -l repo_root (dirname $extracted)
+    if test -f "$repo_root/functions/aireport-cal.sh"
+        cp "$repo_root/functions/aireport-cal.sh" "$fish_function_path[1]/aireport-cal.sh"
+        chmod +x "$fish_function_path[1]/aireport-cal.sh"
+    end
     rm -rf $tmp
 
     __aigit_step "Installing node deps (tsx, dotenv)"
