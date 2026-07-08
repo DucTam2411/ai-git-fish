@@ -9,16 +9,18 @@ async function printProjects() {
 }
 
 // `add-task.ts sprints <projectId>` → "<id>\t<label>" per sprint of that project,
-// newest first, plus a synthetic "0\tNo sprint (backlog)" entry.
+// newest first (so fzf defaults to the newest sprint on Enter), then a synthetic
+// "0\tNo sprint (backlog)" entry last.
 async function printSprints(projectId: string) {
   const sprints = (await fetchAllSprints()).filter((s) => String(s.projectId) === String(projectId))
   sprints.sort((a, b) => String(b.startDate ?? '').localeCompare(String(a.startDate ?? '')))
-  const lines = ['0\tNo sprint (backlog)']
+  const lines: string[] = []
   for (const s of sprints) {
     const start = String(s.startDate ?? '').split(' ')[0]
     const end = String(s.endDate ?? '').split(' ')[0]
     lines.push(`${s.id}\t${s.name}  (${start} → ${end})`)
   }
+  lines.push('0\tNo sprint (backlog)')
   process.stdout.write(`${lines.join('\n')}\n`)
 }
 
