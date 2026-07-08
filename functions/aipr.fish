@@ -209,13 +209,34 @@ $ticket_md"
     end
 
     # --- create or update ---
+    set -l action updated
     if test -n "$pr_url"
         gh pr edit --title "$title" --body-file $tmp
         and __aigit_ok "updated $pr_url"
     else
         gh pr create --base $base --head $branch --title "$title" --body-file $tmp
+        set action created
     end
     set -l rc $status
     rm -f $tmp
-    return $rc
+    if test $rc -ne 0
+        return $rc
+    end
+
+    # --- notify Slack (best-effort; never fails the PR) ---
+    if test -n "$SLACK_WEBHOOK_URL"; and type -q npx; and test -d "$script_dir"
+        set -l final_url $pr_url
+        test -z "$final_url"; and set final_url (gh pr view --json url -q '.url' 2>/dev/null)
+        if test -n "$final_url"
+            set -l author (gh api user -q '.login' 2>/dev/null)
+            set -l ticket_arg -
+            test -n "$ticket"; and set ticket_arg $ticket
+            set -l prev $PWD; cd $script_dir
+            npx --no-install tsx src/notify-pr.ts "$final_url" $action "$author" "$ticket_arg" $title >/dev/null 2>/tmp/aipr-notify.err
+            or __aigit_warn "Slack notify failed (see /tmp/aipr-notify.err)"
+            cd $prev
+        end
+    end
+
+    return 0
 end

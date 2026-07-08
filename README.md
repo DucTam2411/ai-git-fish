@@ -6,8 +6,8 @@ AI-assisted git for [fish](https://fishshell.com). Three functions, powered by D
 |---------|------|
 | `aicommit [hint]` | Generate a Conventional Commit message from your **staged** diff, preview it, commit on confirm. |
 | `aibranch [type]` | fzf-pick a Leantime ticket assigned to you, create/switch to `type/<id>-<slug>` (default `type` = `feat`). |
-| `aipr [hint]` | Push the branch, write a PR title + markdown body from your commits, link the Leantime ticket, create or update the GitHub PR. |
-| `aitask [headline]` | Create a Leantime task: fzf-pick project, fzf-pick sprint, create the ticket, notify Slack (if configured). |
+| `aipr [hint]` | Push the branch, write a PR title + markdown body from your commits, link the Leantime ticket, create or update the GitHub PR, notify Slack reviewers (if configured). |
+| `aitask [headline]` | Create a Leantime task: fzf-pick project, fzf-pick sprint, create the ticket. |
 
 All three auto-detect a ticket id from the branch name (`\d{3,}`), an `AICOMMIT_TICKET` / `AIPR_TICKET` env var, a `#1234` in your hint, or an fzf picker.
 
@@ -38,6 +38,7 @@ It will:
 - `fisher install` the plugin (which downloads the Leantime backend + `npm install`)
 - prompt for `DEEPSEEK_API_KEY` (saved as a universal var)
 - prompt for `LEANTIME_BASE_URL` / `LEANTIME_API_KEY`, then **fzf-pick your user** to set `LEANTIME_USER_ID`
+- prompt for `SLACK_WEBHOOK_URL` (optional) + reviewer mentions
 
 Re-runnable any time to reconfigure.
 
@@ -72,13 +73,15 @@ A `conf.d` hook downloads the Leantime backend into `~/.config/fish/leantime` an
 
 `aicommit` and `aipr` work **without** Leantime — they just skip the ticket section. `aibranch` needs it.
 
-3. **Slack** (optional) — `aitask` posts a "new task created" message to a channel when set. Add to the same `.env`:
+3. **Slack** (optional) — `aipr` posts a PR notification (author, link, ticket, @-mentioned reviewers) to a channel when set. `aigit config` prompts for these; or edit the same `.env` directly:
 
    ```ini
    SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+   SLACK_USER_MAP={"alice":"U0123ABCD","bob":"U0456EFGH"}
+   SLACK_PR_REVIEWERS=alice,bob
    ```
 
-   Create an [Incoming Webhook](https://api.slack.com/messaging/webhooks) bound to the channel you want. Without it, `aitask` just skips the notification.
+   Create an [Incoming Webhook](https://api.slack.com/messaging/webhooks) bound to the channel you want. `SLACK_USER_MAP` maps short names (used in `SLACK_PR_REVIEWERS`) to Slack member ids so `aipr` can @-mention them — also accepts raw Slack ids, `here`/`channel`, or subteam ids directly. Without `SLACK_WEBHOOK_URL`, `aipr` just skips the notification.
 
 > Never commit keys. `DEEPSEEK_API_KEY` belongs in your shell env; `.env` is gitignored.
 

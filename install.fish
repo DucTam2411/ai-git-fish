@@ -197,6 +197,28 @@ printf 'LEANTIME_BASE_URL=%s\nLEANTIME_API_KEY=%s\nLEANTIME_USER_ID=%s\n' \
     "$base" "$key" "$cur_uid" > $LT_DIR/.env
 _ok "wrote base url + api key"
 
+# ---------------------------------------------------------------- Slack (optional)
+_hd "Slack notifications for aipr (optional)"
+set -l cur_slack_url ""; set -l cur_slack_map ""; set -l cur_slack_reviewers ""
+if test -f "$LT_DIR/.env"
+    set cur_slack_url       (string replace -rf '^SLACK_WEBHOOK_URL='  '' -- (grep '^SLACK_WEBHOOK_URL='  $LT_DIR/.env))
+    set cur_slack_map       (string replace -rf '^SLACK_USER_MAP='     '' -- (grep '^SLACK_USER_MAP='     $LT_DIR/.env))
+    set cur_slack_reviewers (string replace -rf '^SLACK_PR_REVIEWERS=' '' -- (grep '^SLACK_PR_REVIEWERS=' $LT_DIR/.env))
+end
+read -l -P "  SLACK_WEBHOOK_URL [$(test -n "$cur_slack_url"; and echo '****'; or echo 'blank to skip')]: " slack_url
+test -z "$slack_url"; and set slack_url $cur_slack_url
+set -l slack_map $cur_slack_map
+set -l slack_reviewers $cur_slack_reviewers
+if test -n "$slack_url"
+    read -l -P "  SLACK_USER_MAP JSON (name->Slack id) [$(test -n "$cur_slack_map"; and echo 'keep current'; or echo 'blank to skip')]: " m
+    test -n "$m"; and set slack_map $m
+    read -l -P "  SLACK_PR_REVIEWERS (comma-separated names) [$cur_slack_reviewers]: " r
+    test -n "$r"; and set slack_reviewers $r
+    _ok "saved Slack config"
+else
+    _warn "skipped — aipr won't post to Slack"
+end
+
 # ---------------------------------------------------------------- pick user id
 _hd "Selecting your Leantime user (LEANTIME_USER_ID)"
 set -g UID_VAL "$cur_uid"
@@ -225,9 +247,9 @@ else
     _warn "no base/key — skipping user fetch"
 end
 
-# rewrite .env with the resolved user id
-printf 'LEANTIME_BASE_URL=%s\nLEANTIME_API_KEY=%s\nLEANTIME_USER_ID=%s\n' \
-    "$base" "$key" "$UID_VAL" > $LT_DIR/.env
+# rewrite .env with the resolved user id + Slack config
+printf 'LEANTIME_BASE_URL=%s\nLEANTIME_API_KEY=%s\nLEANTIME_USER_ID=%s\nSLACK_WEBHOOK_URL=%s\nSLACK_USER_MAP=%s\nSLACK_PR_REVIEWERS=%s\n' \
+    "$base" "$key" "$UID_VAL" "$slack_url" "$slack_map" "$slack_reviewers" > $LT_DIR/.env
 _ok "wrote $LT_DIR/.env"
 
 # ---------------------------------------------------------------- done

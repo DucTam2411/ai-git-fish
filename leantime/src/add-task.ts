@@ -1,6 +1,5 @@
 import 'dotenv/config'
 import { createTicket, fetchAllSprints, fetchProjects, fetchStatusLabels } from './leantime.js'
-import { sendMessage } from './slack.js'
 
 // `add-task.ts projects` → "<id>\t<name>" per project, for aitask's fzf project picker.
 async function printProjects() {
@@ -52,24 +51,6 @@ async function create(projectId: string, sprintId: string, headline: string) {
   const base = (process.env.LEANTIME_BASE_URL ?? '').replace(/\/$/, '')
   const url = `${base}/#/tickets/showTicket/${id}`
   process.stdout.write(`${id}\t${url}\n`)
-
-  // Best-effort: never fail ticket creation because Slack is down/unconfigured.
-  try {
-    const [projects, sprints] = await Promise.all([fetchProjects(), fetchAllSprints()])
-    const projectName = projects.find((p) => String(p.id) === String(projectId))?.name ?? '—'
-    const sprint = sprints.find((s) => String(s.id) === String(sprintId))
-    const sprintName = sprint ? sprint.name : 'Backlog'
-    await sendMessage(
-      [
-        `*New task created*`,
-        `*Project:* ${projectName}`,
-        `*Task:* <${url}|#${id} ${headline}>`,
-        `*Sprint:* ${sprintName}`,
-      ].join('\n')
-    )
-  } catch (err) {
-    console.error(`aitask: Slack notify failed: ${err}`)
-  }
 }
 
 async function main() {
