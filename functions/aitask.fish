@@ -38,14 +38,19 @@ function aitask --description 'Create a Leantime task: fzf-pick project + sprint
         test -s /tmp/aitask.err; and cat /tmp/aitask.err >&2
         return 1
     end
-    set -l picked_project (printf '%s\n' $projects | fzf \
-        --delimiter '\t' --with-nth '2..' \
-        --prompt 'project> ' --height '60%' --reverse --border --header 'Pick a project')
-    if test -z "$picked_project"
-        cd $prev
-        return 1
+    set -l project_id
+    if test (count $projects) -eq 1
+        set project_id (string split \t -- $projects[1])[1]
+    else
+        set -l picked_project (printf '%s\n' $projects | fzf \
+            --delimiter '\t' --with-nth '2..' \
+            --prompt 'project> ' --height '60%' --reverse --border --header 'Pick a project')
+        if test -z "$picked_project"
+            cd $prev
+            return 1
+        end
+        set project_id (string split \t -- $picked_project)[1]
     end
-    set -l project_id (string split \t -- $picked_project)[1]
 
     # --- pick sprint ---
     __aigit_step "Fetching sprints"
