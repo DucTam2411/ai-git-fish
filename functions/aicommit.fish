@@ -62,7 +62,8 @@ function aicommit --description 'Generate conventional commit msg from staged di
     set -l n_lines (count (string split \n -- $diff))
     if test $n_lines -gt $max_lines
         echo "aicommit: diff has $n_lines lines, truncating to $max_lines for the API" >&2
-        set diff (string split \n -- $diff)[1..$max_lines] (printf '\n... [diff truncated: %d of %d lines sent]' $max_lines $n_lines)
+        set -l lines (string split \n -- $diff)
+        set diff $lines[1..$max_lines] (printf '\n... [diff truncated: %d of %d lines sent]' $max_lines $n_lines)
         set diff (string join \n -- $diff)
     end
 
