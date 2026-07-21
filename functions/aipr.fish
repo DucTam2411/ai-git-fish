@@ -97,8 +97,8 @@ RULES:
 - Body uses GitHub markdown. ALWAYS put a blank line before and after every heading and before every bullet list, or GitHub renders it as one paragraph.
 - Start with '## 📝 Summary': 2-4 sentences on WHAT changed and WHY.
 - Then '## 🔧 Changes': a bullet list grouping the meaningful changes (derive from the commit messages + diffstat). One bullet per logical change.
-- Then '## 🧪 How to test': a GitHub checkbox list ('- [ ] ' per item) of concrete steps a reviewer runs to VERIFY this PR. 3-6 items. Derive them from the actual changes — real commands and observable outcomes (e.g. '- [ ] Run `npm test`', '- [ ] Load /login on an expired token, confirm redirect to /'). Prefer specific, checkable steps over generic 'test the feature'. If the diff adds/updates automated tests, make running them the first item.
-- The COMMIT MESSAGES are the source of truth for what was done; diffstat shows file coverage. Ticket context is background scope only — do not claim work the commits don't show. Test steps must exercise only what the diff changes.
+- Then '## 🧪 How to test': a GitHub checkbox list ('- [ ] ' per item) of MANUAL steps a reviewer follows in the running app / deploy preview to SEE the change with their own eyes. NO test commands, NO `npm test`/`pytest`/CI — only things visible by using the app. 3-6 items. Each item = where to go + what to observe (e.g. '- [ ] Open the deploy preview, go to the About page, confirm the hero image is the new banner', '- [ ] Log in with an expired token, confirm you land back on /login'). Describe the visible before→after difference. Skip anything a reviewer can't confirm just by clicking through the preview.
+- The COMMIT MESSAGES are the source of truth for what was done; diffstat shows file coverage. Ticket context is background scope only — do not claim work the commits don't show. Test steps must cover only what the diff visibly changes.
 - Do NOT add a Leantime/ticket section yourself — it is appended automatically.
 - Output ONLY the raw title + body. No code fences, no preamble."
 
