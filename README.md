@@ -6,7 +6,7 @@ AI-assisted git for [fish](https://fishshell.com). Three functions, powered by D
 |---------|------|
 | `aicommit [hint]` | Generate a Conventional Commit message from your **staged** diff, preview it, commit on confirm. |
 | `aibranch [type]` | fzf-pick a Leantime ticket assigned to you, create/switch to `type/<id>-<slug>` (default `type` = `feat`). |
-| `aipr [hint]` | Push the branch, write a PR title + markdown body from your commits, link the Leantime ticket, create or update the GitHub PR, notify Slack reviewers (if configured). |
+| `aipr [hint]` | Push the branch, write a PR title + markdown body (with a `🧪 How to test` checklist) from your commits, link the Leantime ticket, create or update the GitHub PR, notify Slack reviewers (if configured). |
 | `aitask [headline]` | Create a Leantime task: fzf-pick project, fzf-pick sprint, create the ticket. |
 | `aidone [id]` | fzf-pick a Leantime ticket (or pass an id) and mark it Done. |
 
@@ -19,6 +19,7 @@ All three auto-detect a ticket id from the branch name (`\d{3,}`), an `AICOMMIT_
 - `node` ≥ 18 (provides `npx`; `tsx` is installed locally by the bootstrap)
 - `fzf` — for the interactive ticket picker
 - *optional* `gitleaks` — `aicommit` runs a staged-secret scan before any diff leaves your machine
+- `python3` — powers the commit-preview grid and `aicommit`'s dump-code scan (blocks hardcoded `localhost`/loopback host defaults; override an intentional one with `AICOMMIT_ALLOW_SMELLS=1`)
 
 ```sh
 brew install jq gh fzf node gitleaks   # macOS
@@ -101,7 +102,7 @@ aitask "fix flaky login test"            # pick project -> pick sprint -> create
 aidone                                   # pick ticket -> mark Done
 ```
 
-The `aibranch`/`aicommit` ticket picker shows each ticket's live status (`[Done]`, `[New]`, …) alongside the headline.
+The `aibranch`/`aicommit` ticket picker shows each ticket's live status as an emoji (✅ done, 🆕 new, 🚧 in progress, ⏳ waiting/review, ⛔ blocked, 🗄️ archived) alongside the headline; the full status word is in the fzf preview pane.
 
 ## Manage
 

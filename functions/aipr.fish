@@ -97,8 +97,8 @@ RULES:
 - Body uses GitHub markdown. ALWAYS put a blank line before and after every heading and before every bullet list, or GitHub renders it as one paragraph.
 - Start with '## 📝 Summary': 2-4 sentences on WHAT changed and WHY.
 - Then '## 🔧 Changes': a bullet list grouping the meaningful changes (derive from the commit messages + diffstat). One bullet per logical change.
-- The COMMIT MESSAGES are the source of truth for what was done; diffstat shows file coverage. Ticket context is background scope only — do not claim work the commits don't show.
-- Do NOT invent a testing section unless the changes clearly include tests.
+- Then '## 🧪 How to test': a GitHub checkbox list ('- [ ] ' per item) of concrete steps a reviewer runs to VERIFY this PR. 3-6 items. Derive them from the actual changes — real commands and observable outcomes (e.g. '- [ ] Run `npm test`', '- [ ] Load /login on an expired token, confirm redirect to /'). Prefer specific, checkable steps over generic 'test the feature'. If the diff adds/updates automated tests, make running them the first item.
+- The COMMIT MESSAGES are the source of truth for what was done; diffstat shows file coverage. Ticket context is background scope only — do not claim work the commits don't show. Test steps must exercise only what the diff changes.
 - Do NOT add a Leantime/ticket section yourself — it is appended automatically.
 - Output ONLY the raw title + body. No code fences, no preamble."
 

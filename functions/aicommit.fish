@@ -57,6 +57,21 @@ function aicommit --description 'Generate conventional commit msg from staged di
         __aigit_warn "gitleaks not installed — skipping secret scan"
     end
 
+    # --- dump-code smell scan: block hardcoded localhost/host defaults ---
+    # Scans the FULL (untruncated) diff before it leaves the machine. Override
+    # with AICOMMIT_ALLOW_SMELLS=1 when the default is intentional.
+    if type -q python3; and test -z "$AICOMMIT_ALLOW_SMELLS"
+        __aigit_step "Scanning staged changes for dump-code smells"
+        set -l smells (printf '%s' $diff | python3 (dirname (status filename))/aicommit_lint.py)
+        if test $status -ne 0
+            __aigit_err "dump-code smells found — aborting (nothing sent to API)"
+            printf '  %s\n' $smells >&2
+            __aigit_info "hardcoded localhost/host — use config/env for a shippable default"
+            __aigit_info "intentional? override with: AICOMMIT_ALLOW_SMELLS=1 aicommit …"
+            return 1
+        end
+    end
+
     # --- truncate oversized diff to keep token use sane ---
     set -l max_lines 4000
     set -l n_lines (count (string split \n -- $diff))

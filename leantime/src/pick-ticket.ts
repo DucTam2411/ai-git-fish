@@ -34,6 +34,21 @@ function statusLabel(t: any, labels: Record<string, string> = STATUS_LABEL_FALLB
   return labels[raw] ?? STATUS_LABEL_FALLBACK[raw] ?? (raw ? `status ${raw}` : 'unknown')
 }
 
+// Map a (dynamic, per-instance) status label to a single emoji for the picker
+// list. Keyword-matched so custom Leantime workflows still land on a sensible
+// glyph; unknown labels fall back to a neutral ticket icon.
+function statusEmoji(label: string): string {
+  const s = label.toLowerCase()
+  if (/(done|complete|closed|resolved|finish|merged)/.test(s)) return '✅'
+  if (/(progress|doing|wip|active)/.test(s)) return '🚧'
+  if (/(block|impediment)/.test(s)) return '⛔'
+  if (/(wait|approv|review|pending|qa|testing)/.test(s)) return '⏳'
+  if (/(archiv)/.test(s)) return '🗄️'
+  if (/(cancel|reject|won.?t|dropped)/.test(s)) return '🚫'
+  if (/(new|open|todo|to.?do|backlog|created)/.test(s)) return '🆕'
+  return '🎫'
+}
+
 // Common named HTML entities seen in Leantime descriptions. &amp; is decoded last.
 const NAMED_ENTITIES: Record<string, string> = {
   nbsp: ' ',
@@ -88,12 +103,13 @@ function previewText(t: any, labels?: Record<string, string>): string {
   const head = String(t.headline ?? '').replace(/\s+/g, ' ').trim()
   const url = `${LEANTIME_BASE_URL.replace(/\/$/, '')}/#/tickets/showTicket/${t.id}`
   const body = stripHtml(String(t.description ?? '')) || '(no description)'
+  const sl = statusLabel(t, labels)
   const lines = [
     `#${t.id}  ${head}`,
     '─'.repeat(48),
     `Project : ${t.projectName ?? '—'}`,
     `Assignee: ${t.editorFirstname ?? '—'} (id ${t.editorId ?? '—'})`,
-    `Status  : ${statusLabel(t, labels)}`,
+    `Status  : ${statusEmoji(sl)} ${sl}`,
     `Due     : ${fmtDate(t.dateToFinish)}`,
     `Created : ${fmtDate(t.date)}`,
     `Link    : ${url}`,
@@ -217,17 +233,14 @@ async function main() {
   rmSync(CACHE_DIR, { recursive: true, force: true })
   mkdirSync(CACHE_DIR, { recursive: true })
 
-  // Pad status labels into a fixed-width column so headlines line up in fzf.
-  const statuses = tickets.map((t) => statusLabel(t, labels))
-  const statusWidth = Math.max(0, ...statuses.map((s) => s.length))
-
   const lines: string[] = []
-  tickets.forEach((t, i) => {
+  tickets.forEach((t) => {
     writeFileSync(`${CACHE_DIR}/${t.id}.txt`, previewText(t, labels))
     const head = String(t.headline ?? '').replace(/\s+/g, ' ').trim()
-    const status = `[${statuses[i].padEnd(statusWidth)}]`
-    // fzf list line: "<id>\t<status column> <headline>". Field 1 = id (used by preview + caller).
-    lines.push(`${t.id}\t${status} ${head}`)
+    const emoji = statusEmoji(statusLabel(t, labels))
+    // fzf list line: "<id>\t<emoji>  <headline>". Field 1 = id (used by preview + caller).
+    // Full status word lives in the preview pane; the list stays compact with just the glyph.
+    lines.push(`${t.id}\t${emoji}  ${head}`)
   })
 
   process.stdout.write(lines.length ? `${lines.join('\n')}\n` : '')
