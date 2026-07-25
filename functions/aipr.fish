@@ -122,7 +122,7 @@ Author hint (prioritize this intent): $hint"
     end
 
     set -l payload (jq -n --arg sys "$sys" --arg user "$user" \
-        '{model:"deepseek-chat", stream:false, temperature:0.3,
+        '{model:"deepseek-v4-flash", stream:false, temperature:0.3,
           messages:[{role:"system",content:$sys},{role:"user",content:$user}]}')
 
     __aigit_step "Asking DeepSeek for a PR title + body…"
