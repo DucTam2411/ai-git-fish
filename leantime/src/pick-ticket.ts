@@ -192,6 +192,43 @@ async function printMarkdown(id: string) {
   process.stdout.write(block)
 }
 
+// `pick-ticket.ts board <projectId> <sprintId>` → tickets in that sprint, grouped by
+// assignee (alphabetical). A synthetic "new\t..." row is first (aibpm's "add a task to
+// this sprint" shortcut), then one "0\t<name>" header row per group followed by its
+// "<id>\t<bullet>" task rows — "0" and "new" are sentinels, never real ticket ids.
+// sprintId "0" means the backlog (no sprint set). Writes each real ticket's preview
+// cache like the default listing does, so the fzf preview pane works unchanged.
+async function printBoard(projectId: string, sprintId: string) {
+  const [labels, allTickets] = await Promise.all([loadStatusLabels(), fetchAllTickets()])
+  const tickets = allTickets.filter((t: any) => {
+    if (String(t.projectId) !== String(projectId)) return false
+    return sprintId === '0' ? !t.sprint : String(t.sprint) === String(sprintId)
+  })
+
+  rmSync(CACHE_DIR, { recursive: true, force: true })
+  mkdirSync(CACHE_DIR, { recursive: true })
+
+  const groups = new Map<string, { name: string; tickets: any[] }>()
+  for (const t of tickets) {
+    const key = String((t as any).editorId ?? '')
+    const name = String((t as any).editorFirstname ?? '').trim() || 'Unassigned'
+    if (!groups.has(key)) groups.set(key, { name, tickets: [] })
+    groups.get(key)!.tickets.push(t)
+  }
+
+  const lines: string[] = ['new\t➕ New task in this sprint']
+  for (const g of [...groups.values()].sort((a, b) => a.name.localeCompare(b.name))) {
+    lines.push(`0\t▸ ${g.name}`)
+    for (const t of g.tickets) {
+      writeFileSync(`${CACHE_DIR}/${t.id}.txt`, previewText(t, labels))
+      const head = String(t.headline ?? '').replace(/\s+/g, ' ').trim()
+      const emoji = statusEmoji(statusLabel(t, labels))
+      lines.push(`${t.id}\t   - ${emoji} ${head}`)
+    }
+  }
+  process.stdout.write(`${lines.join('\n')}\n`)
+}
+
 // `pick-ticket.ts users` → print "<id>\t<name> <username>" per user, for the
 // installer to fzf-pick LEANTIME_USER_ID. Errors bubble up (exit 1) so the
 // installer can fall back to manual id entry.
@@ -210,6 +247,10 @@ async function printUsers() {
 
 async function main() {
   const arg = process.argv[2]
+  if (arg === 'board' && process.argv[3] && process.argv[4]) {
+    await printBoard(process.argv[3], process.argv[4])
+    return
+  }
   if (arg === 'users') {
     await printUsers()
     return
