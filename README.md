@@ -7,7 +7,8 @@ AI-assisted git for [fish](https://fishshell.com). Three functions, powered by D
 | `aicommit [hint]` | Generate a Conventional Commit message from your **staged** diff, preview it, commit on confirm. |
 | `aibranch [type]` | fzf-pick a Leantime ticket assigned to you, create/switch to `type/<id>-<slug>` (default `type` = `feat`). |
 | `aipr [hint]` | Push the branch, write a PR title + markdown body (with a `🧪 How to test` checklist) from your commits, link the Leantime ticket, create or update the GitHub PR, notify Slack reviewers (if configured). |
-| `aitask [headline]` | Create a Leantime task: fzf-pick project, fzf-pick sprint, create the ticket. |
+| `aitask [headline]` | Create a Leantime task assigned to **you**: fzf-pick project, fzf-pick sprint, create the ticket. |
+| `aibpm [headline]` | Create a task in the BPM project (Anymateme Web platform, fixed — no project picker): fzf-pick the **assignee**, fzf-pick sprint, create the ticket. |
 | `aidone [id]` | fzf-pick a Leantime ticket (or pass an id) and mark it Done. |
 | `aistatus [id]` | Dashboard loop: fzf-pick a Leantime ticket assigned to you (or pass an id for the first round), fzf-pick any status to set it to, then back to the ticket list — refreshed — until you exit the picker. |
 
@@ -98,7 +99,9 @@ aibranch fix                             # pick ticket -> fix/1234-slug
 
 aipr "focus on the migration"            # open / update the GitHub PR
 
-aitask "fix flaky login test"            # pick project -> pick sprint -> create task
+aitask "fix flaky login test"            # pick project -> pick sprint -> create task (assigned to you)
+
+aibpm "fix flaky login test"             # pick assignee -> pick sprint -> create BPM task
 
 aidone                                   # pick ticket -> mark Done
 

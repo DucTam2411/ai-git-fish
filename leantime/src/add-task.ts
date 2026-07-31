@@ -24,12 +24,9 @@ async function printSprints(projectId: string) {
   process.stdout.write(`${lines.join('\n')}\n`)
 }
 
-// `add-task.ts create <projectId> <sprintId> <headline>` → create the ticket,
-// print "<id>\t<url>" on success.
-async function create(projectId: string, sprintId: string, headline: string) {
-  const editorId = process.env.LEANTIME_USER_ID
-  if (!editorId) throw new Error('LEANTIME_USER_ID not set')
-
+// Shared by `create` (self as editor) and `createFor` (explicit editor, e.g. aibpm's
+// assignee picker). Prints "<id>\t<url>" on success.
+async function doCreate(projectId: string, sprintId: string, editorId: string, headline: string) {
   let statusId: number | string = 3 // fallback "New"
   try {
     const labels = await fetchStatusLabels()
@@ -53,13 +50,29 @@ async function create(projectId: string, sprintId: string, headline: string) {
   process.stdout.write(`${id}\t${url}\n`)
 }
 
+// `add-task.ts create <projectId> <sprintId> <headline...>` → create, assigned to you.
+async function create(projectId: string, sprintId: string, headline: string) {
+  const editorId = process.env.LEANTIME_USER_ID
+  if (!editorId) throw new Error('LEANTIME_USER_ID not set')
+  return doCreate(projectId, sprintId, editorId, headline)
+}
+
+// `add-task.ts createFor <projectId> <sprintId> <editorId> <headline...>` → create,
+// assigned to whichever member id the caller (aibpm's fzf picker) resolved.
+async function createFor(projectId: string, sprintId: string, editorId: string, headline: string) {
+  return doCreate(projectId, sprintId, editorId, headline)
+}
+
 async function main() {
-  const [cmd, a1, a2, ...rest] = process.argv.slice(2)
+  const [cmd, a1, a2, a3, ...rest] = process.argv.slice(2)
   if (cmd === 'projects') return printProjects()
   if (cmd === 'sprints' && a1) return printSprints(a1)
-  if (cmd === 'create' && a1 && a2 && rest.length) return create(a1, a2, rest.join(' '))
+  if (cmd === 'create' && a1 && a2 && a3) return create(a1, a2, [a3, ...rest].join(' '))
+  if (cmd === 'createFor' && a1 && a2 && a3 && rest.length) return createFor(a1, a2, a3, rest.join(' '))
 
-  console.error('usage: add-task.ts projects | sprints <projectId> | create <projectId> <sprintId> <headline...>')
+  console.error(
+    'usage: add-task.ts projects | sprints <projectId> | create <projectId> <sprintId> <headline...> | createFor <projectId> <sprintId> <editorId> <headline...>'
+  )
   process.exit(1)
 }
 
