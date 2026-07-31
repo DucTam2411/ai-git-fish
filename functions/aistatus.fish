@@ -36,8 +36,10 @@ function aistatus --description 'fzf-pick a Leantime ticket assigned to you and 
 
     set -l picked (printf '%s\n' $statuses | fzf \
         --delimiter '\t' --with-nth '2..' \
-        --prompt 'status> ' --height '60%' --reverse --border \
-        --header "Set status for ticket #$id")
+        --prompt 'status> ' --height '85%' --reverse --border \
+        --header "Set status for ticket #$id" \
+        --preview "cat /tmp/leantime-pick/$id.txt" \
+        --preview-window 'right,55%,wrap')
     if test -z "$picked"
         cd $prev
         return 1
