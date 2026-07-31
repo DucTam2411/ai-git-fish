@@ -1,4 +1,4 @@
-function aibpm --description 'Create a BPM (Anymateme Web platform) Leantime task, or `aibpm board` to browse the sprint board'
+function aibpm --description 'BPM (Anymateme Web platform) sprint board; pass a headline to fast-create instead of browsing'
     set -l script_dir "$LEANTIME_SCRIPT_DIR"
     test -z "$script_dir"
     and set script_dir ~/.config/fish/leantime
@@ -22,7 +22,9 @@ function aibpm --description 'Create a BPM (Anymateme Web platform) Leantime tas
     test -z "$project_id"
     and set project_id 2
 
-    if test "$argv[1]" = board
+    # No headline given (bare `aibpm`, or explicit `aibpm board`) -> browse, don't
+    # force a create flow. Pass a headline to skip straight to fast-create instead.
+    if test -z "$argv"; or test "$argv[1]" = board
         __aibpm_board $script_dir $project_id
         return
     end

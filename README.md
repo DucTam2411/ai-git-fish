@@ -8,8 +8,8 @@ AI-assisted git for [fish](https://fishshell.com). Three functions, powered by D
 | `aibranch [type]` | fzf-pick a Leantime ticket assigned to you, create/switch to `type/<id>-<slug>` (default `type` = `feat`). |
 | `aipr [hint]` | Push the branch, write a PR title + markdown body (with a `🧪 How to test` checklist) from your commits, link the Leantime ticket, create or update the GitHub PR, notify Slack reviewers (if configured). |
 | `aitask [headline]` | Create a Leantime task assigned to **you**: fzf-pick project, fzf-pick sprint, create the ticket. |
-| `aibpm [headline]` | Create a task in the BPM project (Anymateme Web platform, fixed — no project picker): fzf-pick sprint, fzf-pick the **assignee**, create the ticket. |
-| `aibpm board` | BPM sprint board: pick a sprint, browse its tasks grouped by assignee. Pick a task to set its status, or the `➕ New task` row to add one to that sprint — both loop back to the refreshed board until you exit. |
+| `aibpm` | BPM (Anymateme Web platform, fixed project) sprint board: pick a sprint, browse its tasks grouped by assignee. Pick a task to set its status, or the `➕ New task` row to fzf-pick an assignee and create one — both loop back to the refreshed board until you exit. |
+| `aibpm [headline]` | Skip the board: fzf-pick sprint, fzf-pick assignee, create the ticket directly. |
 | `aidone [id]` | fzf-pick a Leantime ticket (or pass an id) and mark it Done. |
 | `aistatus [id]` | Dashboard loop: fzf-pick a Leantime ticket assigned to you (or pass an id for the first round), fzf-pick any status to set it to, then back to the ticket list — refreshed — until you exit the picker. |
 
@@ -102,9 +102,9 @@ aipr "focus on the migration"            # open / update the GitHub PR
 
 aitask "fix flaky login test"            # pick project -> pick sprint -> create task (assigned to you)
 
-aibpm "fix flaky login test"             # pick sprint -> pick assignee -> create BPM task
+aibpm                                     # pick sprint -> board by assignee -> set status / add task -> loop
 
-aibpm board                              # pick sprint -> board by assignee -> set status / add task -> loop
+aibpm "fix flaky login test"             # skip the board -> pick sprint -> pick assignee -> create BPM task
 
 aidone                                   # pick ticket -> mark Done
 
