@@ -9,7 +9,7 @@ AI-assisted git for [fish](https://fishshell.com). Three functions, powered by D
 | `aipr [hint]` | Push the branch, write a PR title + markdown body (with a `🧪 How to test` checklist) from your commits, link the Leantime ticket, create or update the GitHub PR, notify Slack reviewers (if configured). |
 | `aitask [headline]` | Create a Leantime task: fzf-pick project, fzf-pick sprint, create the ticket. |
 | `aidone [id]` | fzf-pick a Leantime ticket (or pass an id) and mark it Done. |
-| `aistatus [id]` | fzf-pick a Leantime ticket assigned to you (or pass an id), then fzf-pick any status to set it to. |
+| `aistatus [id]` | Dashboard loop: fzf-pick a Leantime ticket assigned to you (or pass an id for the first round), fzf-pick any status to set it to, then back to the ticket list — refreshed — until you exit the picker. |
 
 All three auto-detect a ticket id from the branch name (`\d{3,}`), an `AICOMMIT_TICKET` / `AIPR_TICKET` env var, a `#1234` in your hint, or an fzf picker.
 
@@ -102,7 +102,7 @@ aitask "fix flaky login test"            # pick project -> pick sprint -> create
 
 aidone                                   # pick ticket -> mark Done
 
-aistatus                                 # pick ticket -> pick status -> set it
+aistatus                                 # pick ticket -> pick status -> set it -> back to the list
 ```
 
 The `aibranch`/`aicommit` ticket picker shows each ticket's live status as an emoji (✅ done, 🆕 new, 🚧 in progress, ⏳ waiting/review, ⛔ blocked, 🗄️ archived) alongside the headline; the full status word is in the fzf preview pane.
