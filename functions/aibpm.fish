@@ -130,19 +130,29 @@ function __aibpm_board --argument-names script_dir project_id
         cd $script_dir
         __aigit_step "Fetching board"
         set -l board (npx --no-install tsx src/pick-ticket.ts board $project_id $sprint_id 2>/tmp/aibpm.err)
-        cd $prev
         if test -z "$board"
+            cd $prev
             __aigit_err "aibpm: no board data for this sprint"
             test -s /tmp/aibpm.err; and cat /tmp/aibpm.err >&2
             return 1
         end
 
+        # </>: cycle that row's status one step (wraps), redrawn from local state
+        # instantly — no network wait in the hot path (updates fire in the
+        # background; see cycle-status in pick-ticket.ts). ctrl-r: full re-fetch,
+        # for when you want the real, reconciled state (e.g. someone else edited
+        # it). Both run with cwd = $script_dir so their relative `src/...` paths
+        # resolve; that's why the fzf call stays inside the cd/cd-back pair below.
         set -l picked (printf '%s\n' $board | fzf \
             --delimiter '\t' --with-nth '2..' \
             --prompt 'task> ' --height '90%' --reverse --border \
-            --header "$sprint_label  ·  enter a task: set status  ·  enter the + row: add task" \
+            --header "$sprint_label   [</> cycle status]  [ctrl-r refresh]  [enter: full status picker / add task]" \
             --preview 'cat /tmp/leantime-pick/{1}.txt 2>/dev/null' \
-            --preview-window 'right,55%,wrap')
+            --preview-window 'right,55%,wrap' \
+            --bind '<:execute-silent(npx --no-install tsx src/pick-ticket.ts cycle-status {1} prev)+reload(npx --no-install tsx src/pick-ticket.ts render-state)' \
+            --bind '>:execute-silent(npx --no-install tsx src/pick-ticket.ts cycle-status {1} next)+reload(npx --no-install tsx src/pick-ticket.ts render-state)' \
+            --bind "ctrl-r:reload(npx --no-install tsx src/pick-ticket.ts board $project_id $sprint_id)")
+        cd $prev
         if test -z "$picked"
             return 0
         end

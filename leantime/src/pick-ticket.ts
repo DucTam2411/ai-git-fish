@@ -1,9 +1,13 @@
 import 'dotenv/config'
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { spawn } from 'node:child_process'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { fetchAllTickets, fetchStatusLabels, fetchUsers, type LeantimeTicket } from './leantime.js'
 
 // Shared cache dir. fzf preview reads pre-rendered <id>.txt from here (instant, no re-fetch).
 const CACHE_DIR = '/tmp/leantime-pick'
+// aibpm board's local state: tickets + labels from the last real fetch, so h/l
+// status-cycling can redraw instantly from disk instead of hitting the network.
+const BOARD_STATE_FILE = `${CACHE_DIR}/_board-state.json`
 const LEANTIME_BASE_URL = process.env.LEANTIME_BASE_URL ?? 'https://leantime.anymateme.store'
 
 // Leantime's built-in defaults, used only if the dynamic fetch fails. Status ids
@@ -192,12 +196,37 @@ async function printMarkdown(id: string) {
   process.stdout.write(block)
 }
 
+// Shared by printBoard (from a live fetch) and printRenderState (from local disk
+// state, after an h/l cycle) — the two must group/format identically or the board
+// visibly jumps when a local-only redraw replaces a server-fetched one.
+function renderBoardLines(tickets: any[], labels: Record<string, string>): string[] {
+  const groups = new Map<string, { name: string; tickets: any[] }>()
+  for (const t of tickets) {
+    const key = String(t.editorId ?? '')
+    const name = String(t.editorFirstname ?? '').trim() || 'Unassigned'
+    if (!groups.has(key)) groups.set(key, { name, tickets: [] })
+    groups.get(key)!.tickets.push(t)
+  }
+
+  const lines: string[] = ['new\t➕ New task in this sprint']
+  for (const g of [...groups.values()].sort((a, b) => a.name.localeCompare(b.name))) {
+    lines.push(`0\t▸ ${g.name}`)
+    for (const t of g.tickets) {
+      const head = String(t.headline ?? '').replace(/\s+/g, ' ').trim()
+      const emoji = statusEmoji(statusLabel(t, labels))
+      lines.push(`${t.id}\t   - ${emoji} ${head}`)
+    }
+  }
+  return lines
+}
+
 // `pick-ticket.ts board <projectId> <sprintId>` → tickets in that sprint, grouped by
 // assignee (alphabetical). A synthetic "new\t..." row is first (aibpm's "add a task to
 // this sprint" shortcut), then one "0\t<name>" header row per group followed by its
 // "<id>\t<bullet>" task rows — "0" and "new" are sentinels, never real ticket ids.
 // sprintId "0" means the backlog (no sprint set). Writes each real ticket's preview
-// cache like the default listing does, so the fzf preview pane works unchanged.
+// cache like the default listing does, so the fzf preview pane works unchanged. Also
+// snapshots tickets+labels to BOARD_STATE_FILE for render-state/cycle-status to use.
 async function printBoard(projectId: string, sprintId: string) {
   const [labels, allTickets] = await Promise.all([loadStatusLabels(), fetchAllTickets()])
   const tickets = allTickets.filter((t: any) => {
@@ -207,26 +236,55 @@ async function printBoard(projectId: string, sprintId: string) {
 
   rmSync(CACHE_DIR, { recursive: true, force: true })
   mkdirSync(CACHE_DIR, { recursive: true })
+  for (const t of tickets) writeFileSync(`${CACHE_DIR}/${t.id}.txt`, previewText(t, labels))
 
-  const groups = new Map<string, { name: string; tickets: any[] }>()
-  for (const t of tickets) {
-    const key = String((t as any).editorId ?? '')
-    const name = String((t as any).editorFirstname ?? '').trim() || 'Unassigned'
-    if (!groups.has(key)) groups.set(key, { name, tickets: [] })
-    groups.get(key)!.tickets.push(t)
-  }
+  const statusOrder = Object.keys(labels)
+    .map(Number)
+    .sort((a, b) => a - b)
+    .map(String)
+  writeFileSync(BOARD_STATE_FILE, JSON.stringify({ tickets, labels, statusOrder, projectId, sprintId }))
 
-  const lines: string[] = ['new\t➕ New task in this sprint']
-  for (const g of [...groups.values()].sort((a, b) => a.name.localeCompare(b.name))) {
-    lines.push(`0\t▸ ${g.name}`)
-    for (const t of g.tickets) {
-      writeFileSync(`${CACHE_DIR}/${t.id}.txt`, previewText(t, labels))
-      const head = String(t.headline ?? '').replace(/\s+/g, ' ').trim()
-      const emoji = statusEmoji(statusLabel(t, labels))
-      lines.push(`${t.id}\t   - ${emoji} ${head}`)
-    }
-  }
-  process.stdout.write(`${lines.join('\n')}\n`)
+  process.stdout.write(`${renderBoardLines(tickets, labels).join('\n')}\n`)
+}
+
+// `pick-ticket.ts render-state` → redraw the board from BOARD_STATE_FILE (no network),
+// bound to fzf's </> reload so a status cycle redraws instantly. Silent no-op (exit 0,
+// no output — fzf's reload just gets nothing to chew on) if the board was never opened.
+async function printRenderState() {
+  if (!existsSync(BOARD_STATE_FILE)) return
+  const state = JSON.parse(readFileSync(BOARD_STATE_FILE, 'utf8'))
+  process.stdout.write(`${renderBoardLines(state.tickets, state.labels).join('\n')}\n`)
+}
+
+// `pick-ticket.ts cycle-status <ticketId> <next|prev>` → step the ticket's status one
+// slot through BOARD_STATE_FILE's statusOrder (wrapping), update local state + that
+// ticket's preview cache immediately (so render-state/preview reflect it with no
+// network wait), then fire the real Leantime update in a DETACHED background process
+// — this call must return fast since fzf's execute-silent blocks on it, so the actual
+// PATCH can't happen inline here or every keypress would stall the UI. No-ops quietly
+// on a header/"new task"/stale row (ticket not found) or if the board state is missing.
+async function cycleStatus(idArg: string, direction: string) {
+  if (!existsSync(BOARD_STATE_FILE)) return
+  const state = JSON.parse(readFileSync(BOARD_STATE_FILE, 'utf8'))
+  const ticket = state.tickets.find((t: any) => String(t.id) === String(idArg))
+  if (!ticket) return
+
+  const order: string[] = state.statusOrder
+  const curIdx = order.indexOf(String(ticket.status))
+  if (curIdx === -1) return
+  const delta = direction === 'prev' ? -1 : 1
+  const nextStatusId = order[(curIdx + delta + order.length) % order.length]
+  const nextStatusName = String(state.labels[nextStatusId] ?? '')
+  if (!nextStatusName) return
+
+  ticket.status = nextStatusId
+  writeFileSync(BOARD_STATE_FILE, JSON.stringify(state))
+  writeFileSync(`${CACHE_DIR}/${ticket.id}.txt`, previewText(ticket, state.labels))
+
+  spawn('npx', ['--no-install', 'tsx', 'src/set-status.ts', String(ticket.id), nextStatusName], {
+    detached: true,
+    stdio: 'ignore',
+  }).unref()
 }
 
 // `pick-ticket.ts users` → print "<id>\t<name> <username>" per user, for the
@@ -249,6 +307,14 @@ async function main() {
   const arg = process.argv[2]
   if (arg === 'board' && process.argv[3] && process.argv[4]) {
     await printBoard(process.argv[3], process.argv[4])
+    return
+  }
+  if (arg === 'render-state') {
+    await printRenderState()
+    return
+  }
+  if (arg === 'cycle-status' && process.argv[3] && process.argv[4]) {
+    await cycleStatus(process.argv[3], process.argv[4])
     return
   }
   if (arg === 'users') {
