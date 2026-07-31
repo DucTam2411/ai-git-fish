@@ -25,7 +25,7 @@ function aibpm --description 'Create a BPM (Anymateme Web platform) Leantime tas
     # --- headline: arg (joined) or interactive prompt ---
     set -l headline "$argv"
     if test -z "$headline"
-        read -l -P (__aigit_col -o cyan)'? '(__aigit_col normal)'Task headline: ' headline
+        read -P "$(__aigit_col -o cyan)? $(__aigit_col normal)Task headline: " headline
     end
     if test -z "$headline"
         __aigit_err "aibpm: empty headline"
