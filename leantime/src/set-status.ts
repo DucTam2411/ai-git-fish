@@ -1,16 +1,28 @@
 import 'dotenv/config'
 import { fetchAllTickets, fetchStatusLabels, updateTicketStatus } from './leantime.js'
 
-// `set-status.ts <id> [statusName]` → resolve statusName (case-insensitive, default
-// "Done") against the instance's real status labels, patch the ticket, print the
-// resolved label. Status ids are configurable per instance, so never hardcode them.
+// `set-status.ts labels` → "<id>\t<name>" per status, numeric id ascending, for
+// aistatus's fzf status picker. Status ids/names are configurable per instance.
+async function printLabels() {
+  const labels = await fetchStatusLabels()
+  const lines = Object.entries(labels)
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([id, def]) => `${id}\t${(def as any)?.name ?? `status ${id}`}`)
+  process.stdout.write(lines.length ? `${lines.join('\n')}\n` : '')
+}
+
+// `set-status.ts <id> [statusName...]` → resolve statusName (case-insensitive, default
+// "Done", words rejoined since fish splits unquoted multi-word args) against the
+// instance's real status labels, patch the ticket, print the resolved label. Status
+// ids are configurable per instance, so never hardcode them.
 async function main() {
-  const [id, statusNameArg] = process.argv.slice(2)
+  const [id, ...rest] = process.argv.slice(2)
   if (!id) {
-    console.error('usage: set-status.ts <ticketId> [statusName]')
+    console.error('usage: set-status.ts <ticketId> [statusName...] | set-status.ts labels')
     process.exit(1)
   }
-  const statusName = statusNameArg ?? 'Done'
+  if (id === 'labels') return printLabels()
+  const statusName = rest.length ? rest.join(' ') : 'Done'
 
   const [labels, tickets] = await Promise.all([fetchStatusLabels(), fetchAllTickets()])
   const ticket = tickets.find((t) => String(t.id) === String(id)) as any
