@@ -40,7 +40,7 @@ async function main() {
   }
   const [statusId, def] = entry
 
-  await updateTicketStatus(id, ticket.projectId, statusId)
+  await updateTicketStatus(id, statusId)
   process.stdout.write(`${(def as any).name}\n`)
 }
 
