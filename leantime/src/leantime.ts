@@ -92,14 +92,19 @@ export async function createTicket(values: NewTicketValues): Promise<number> {
   return Number(result[0])
 }
 
-// updateTicket 500s with "project id is not set" unless projectId is included
-// even though we're only changing status — Leantime re-validates project access.
-export async function updateTicketStatus(
-  id: number | string,
-  projectId: number | string,
-  status: number | string
-): Promise<void> {
-  await rpc('leantime.rpc.tickets.tickets.updateTicket', { values: { id, projectId, status } })
+// Don't use updateTicket here: before Leantime's partial-update fix (#3701) it rewrites
+// every column, defaulting anything not sent to '' — so a status-only update wiped the
+// assignee, sprint, milestone, dates, description, tags... patch only writes the given
+// fields. Newer Leantime moved the RPC entry point to patchTicket(id, values), so fall
+// back to that if patch isn't exposed.
+export async function updateTicketStatus(id: number | string, status: number | string): Promise<void> {
+  let ok: unknown
+  try {
+    ok = await rpc('leantime.rpc.tickets.tickets.patch', { id, params: { status } })
+  } catch {
+    ok = await rpc('leantime.rpc.tickets.tickets.patchTicket', { id: Number(id), values: { status } })
+  }
+  if (ok === false) throw new Error(`Leantime refused to patch ticket ${id}`)
 }
 
 // Used by the installer to pick a LEANTIME_USER_ID. Tries a few known method
